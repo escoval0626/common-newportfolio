@@ -576,8 +576,14 @@
        ドットとSNSアイコンがタップ領域(8px, 26px)未満、等の破綻があった ===== */
     @media (max-width: 767px) {
       /* デスクトップは冒頭詩コピーとの重なりを避けて9%へ上げたが、モバイルは
-         元々重ならない（xp-copyの箱が78vw制限で小さくなるため）ので従来位置を維持 */
-      .hero-title { top: 21%; }
+         元々重ならない（xp-copyの箱が78vw制限で小さくなるため）想定だった。
+         実機(iPhone SE 375px)では詩コピーの3D投影位置がタイトル直下(6px差)
+         まで来て密着して見えていたため、もう少し上げて余白を確保する */
+      .hero-title { top: 15%; }
+      /* letter-spacing 0.42em のまま英字17文字超を並べると、375px幅では
+         右側の進行ドット列（right基準で幅44px）に文字が届いてしまっていた */
+      .hero-title__sub { font-size: 10px; letter-spacing: 0.24em; gap: 10px; }
+      .hero-title__sub::before { width: clamp(18px, 4vw, 32px); }
       /* コピーは折り返す。3D投影の位置決めは変えず、箱の幅だけ制限する */
       .xp-copy { max-width: 78vw; }
       .xp-copy__en { white-space: normal; line-height: 1.7; font-size: 11px; }

@@ -3656,7 +3656,7 @@ function adaptQuality(dt) {
 ============================================================ */
 const TRAILER = new URLSearchParams(location.search).get("trailer") === "1";
 if (TRAILER) {
-  const W = 1920, H = 1080, FPS = 30, SECONDS = 10;
+  const W = 1080, H = 1920, FPS = 30, SECONDS = 30;
   const TOTAL = FPS * SECONDS;
   const cap = document.createElement("canvas");
   cap.width = W; cap.height = H;
@@ -3669,7 +3669,78 @@ if (TRAILER) {
   if (m) paperImg.src = m[1];
 
   const ease = (k) => k * k * (3 - 2 * k);
+  const ease2 = (k) => (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2); /* GSAP power2.inOut相当 */
   const seg = (t, a, b) => THREE.MathUtils.clamp((t - a) / (b - a), 0, 1);
+
+  /* 下層カルーセルを見せる2箇所。旅を一旦止めてここだけ部屋を開く */
+  const AREA_BY_NAME = {};
+  AREAS.forEach((a) => { AREA_BY_NAME[a.name] = a; });
+  const ROOM_SPOTS = [
+    { name: "ARCHITECTURES", openStart: 11.0, openDur: 1.3, holdDur: 2.0, closeDur: 1.2 },
+    { name: "EXHIBITIONS", openStart: 22.5, openDur: 1.1, holdDur: 1.5, closeDur: 1.2 },
+  ].map((s) => {
+    const holdStart = s.openStart + s.openDur;
+    const closeStart = holdStart + s.holdDur;
+    return { ...s, area: AREA_BY_NAME[s.name], holdStart, closeStart, end: closeStart + s.closeDur };
+  });
+  function findRoomSpot(t) {
+    return ROOM_SPOTS.find((s) => t >= s.openStart && t < s.end);
+  }
+  let roomOpenedFor = null;
+  function updateRoomSpot(spot, t, dt) {
+    const area = spot.area;
+    if (roomOpenedFor !== spot.name) {
+      const room = buildPlaceRoom(area);
+      room.group.visible = true;
+      rig.roomView = room.view;
+      rig.roomLook = room.look;
+      room.snapPending = true;
+      roomScroll.target = roomScroll.current = room.offsetOf(0);
+      room.mats.forEach((mm) => { mm.uniforms.uOpacity.value = 0; });
+      roomOpenedFor = spot.name;
+      /* updateRoom(dt) はこのグローバルを見て初めて写真の実体化(ensureRoomTexture)や
+         列送りを行う。ここが未設定だと板は最後まで白紙のプレースホルダーのまま
+         （openGallery の通常経路では onComplete で自動的にセットされていた） */
+      activeRoom = room;
+    }
+    const room = area._room;
+    rig.target = area.t;
+    let detour;
+    if (t < spot.holdStart) {
+      detour = ease2(seg(t, spot.openStart, spot.holdStart));
+    } else if (t < spot.closeStart) {
+      detour = 1;
+      /* 見せ場を1枚だけで終わらせず、隣の1枚へゆっくり流す */
+      if (room.positions && room.positions.length > 1) {
+        const k = seg(t, spot.holdStart + spot.holdDur * 0.3, spot.holdStart + spot.holdDur * 0.85);
+        roomScroll.target = THREE.MathUtils.lerp(room.positions[0], room.positions[1], k);
+      }
+    } else {
+      detour = 1 - ease2(seg(t, spot.closeStart, spot.end));
+    }
+    rig.detour = detour;
+    const op = THREE.MathUtils.clamp(detour, 0, 1) * 0.98;
+    room.mats.forEach((mm) => { mm.uniforms.uOpacity.value = op; });
+    updateCamera(dt);
+    updateRoom(dt);
+    /* 個々の写真のロード完了フェードは通常 GSAP tween が担うが、GSAP の
+       ticker は requestAnimationFrame 依存で、撮影中の tab がバックグラウンド
+       扱いだと進まないことがある。ロード済みのものは確実に前面へ出す */
+    room.meshes.forEach((mm) => {
+      if (mm.userData.loaded) {
+        const u = mm.material.uniforms;
+        u.uOpacity.value = Math.min(1, u.uOpacity.value + dt * 6);
+      }
+    });
+    if (t >= spot.end - dt * 0.5) {
+      room.group.visible = false;
+      rig.detour = 0;
+      rig.roomView = null;
+      rig.roomLook = null;
+      activeRoom = null;
+    }
+    return area;
+  }
 
   function drawVeil(alpha) {
     if (alpha <= 0.002) return;
@@ -3683,24 +3754,76 @@ if (TRAILER) {
   }
 
   function drawType(t) {
-    /* 冒頭のロックアップ／終わりの署名。旅の最中は文字を出さない */
-    const inTitle = seg(t, 0.5, 1.4) * (1 - seg(t, 2.5, 3.1));
-    const endCard = seg(t, 9.0, 9.6);
+    /* 冒頭のロックアップ／終わりの署名。旅の最中は文字を出さない。
+       縦長は横幅に余裕がないので、常に中央寄せの一本組みで統一する */
+    const inTitle = seg(t, 0.8, 1.6) * (1 - seg(t, 3.0, 3.8));
+    const endCard = seg(t, 27.6, 28.6);
     const a = Math.max(inTitle, endCard);
     if (a <= 0.01) return;
-    const centered = endCard > inTitle;
-    const x = centered ? W * 0.5 : W * 0.085;
-    const y = centered ? H * 0.5 : H * 0.30;
+    const x = W * 0.5;
+    const y = H * 0.47;
     cx.save();
     cx.globalAlpha = a;
-    cx.textAlign = centered ? "center" : "left";
+    cx.textAlign = "center";
+
+    /* 「サイトをリニューアルしました」のバッジ。既存ENTERボタンと同じ、
+       線で囲んだだけの控えめな意匠に合わせる。
+       ctx.letterSpacing はブラウザの実装によって、実際の描画位置と
+       measureText() が返す値の基準がズレる（textAlign=center と組むと
+       末尾の余白ぶん文字列全体が右へ寄って見えていた）。Canvas標準の
+       letterSpacing には頼らず、1文字ずつ手動で置くことで、幅の計算と
+       実際の描画位置を完全に一致させ、枠との対称性を保証する */
+    cx.font = `400 ${Math.round(W * 0.026)}px "Josefin Sans", sans-serif`;
+    const badge = "SITE RENEWED";
+    const letterGap = W * 0.014;
+    const chars = [...badge];
+    cx.textAlign = "left";
+    const charWidths = chars.map((c) => cx.measureText(c).width);
+    const textW = charWidths.reduce((s, w) => s + w, 0) + letterGap * (chars.length - 1);
+    const padX = W * 0.032, padY = H * 0.0095;
+    const badgeY = y - H * 0.085;
+    const boxL = x - textW / 2 - padX, boxR = x + textW / 2 + padX;
+    cx.strokeStyle = "rgba(23,20,16,0.5)";
+    cx.lineWidth = Math.max(1, W * 0.0014);
+    cx.strokeRect(boxL, badgeY - padY * 1.9, boxR - boxL, padY * 3.8);
     cx.fillStyle = "#171410";
-    cx.font = `300 italic ${Math.round(W * 0.058)}px "Cormorant Garamond", serif`;
+    let charX = x - textW / 2;
+    chars.forEach((c, i) => {
+      cx.fillText(c, charX, badgeY);
+      charX += charWidths[i] + letterGap;
+    });
+    cx.textAlign = "center";
+
+    cx.fillStyle = "#171410";
+    cx.font = `300 italic ${Math.round(W * 0.135)}px "Cormorant Garamond", serif`;
     cx.fillText("Common", x, y);
-    cx.font = `300 ${Math.round(W * 0.0105)}px "Josefin Sans", sans-serif`;
-    cx.letterSpacing = `${Math.round(W * 0.0042)}px`;
+    cx.font = `300 ${Math.round(W * 0.0225)}px "Josefin Sans", sans-serif`;
+    cx.letterSpacing = `${Math.round(W * 0.009)}px`;
     cx.fillStyle = "#4e4941";
-    cx.fillText("PORTFOLIO — SHO KITAGO", x, y + H * 0.055);
+    cx.fillText("PORTFOLIO — SHO KITAGO", x, y + H * 0.038);
+    cx.restore();
+  }
+
+  /* 情景に着いた時の見出しと詩コピー。CONTACT は署名カードで別に扱うため除く */
+  function drawAreaCaption(area, capW) {
+    if (!area || area.isAbout || area.name === "CONTACT") return;
+    const a = THREE.MathUtils.clamp((capW - 0.45) / 0.25, 0, 1);
+    if (a <= 0.01) return;
+    const x = W * 0.09;
+    const yBase = H * 0.87;
+    cx.save();
+    cx.globalAlpha = a;
+    cx.textAlign = "left";
+    cx.fillStyle = "#171410";
+    cx.font = `400 ${Math.round(W * 0.052)}px "Josefin Sans", sans-serif`;
+    cx.letterSpacing = `${Math.round(W * 0.008)}px`;
+    cx.fillText(area.name, x, yBase);
+    if (area.lines && area.lines.length) {
+      cx.font = `400 ${Math.round(W * 0.0275)}px "Zen Old Mincho", serif`;
+      cx.letterSpacing = "0px";
+      cx.fillStyle = "#55534e";
+      area.lines.forEach((ln, i) => cx.fillText(ln, x, yBase + H * 0.048 + i * H * 0.037));
+    }
     cx.restore();
   }
 
@@ -3715,15 +3838,29 @@ if (TRAILER) {
     renderer.setPixelRatio(1);
     renderer.setSize(W, H, false);
     camera.aspect = W / H;
+    /* 縦長は resize() と同じ補正で水平画角を保つ（BASE_FOV/BASE_ASPECTは
+       この後ろで定義される通常の resize() 用の値をそのまま流用する） */
+    if (camera.aspect < BASE_ASPECT) {
+      const k = Math.min(BASE_ASPECT / camera.aspect, 2.35);
+      camera.fov = THREE.MathUtils.radToDeg(
+        2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(BASE_FOV) / 2) * k)
+      );
+    } else {
+      camera.fov = BASE_FOV;
+    }
     camera.updateProjectionMatrix();
     lineMats.forEach((mm) => mm.resolution.set(W, H));
 
     const dt = 1 / FPS;
+    const pending = [];
+    const MAX_INFLIGHT = 6; /* fetchの完了を待たずに次のコマへ進み、体感速度を上げる */
+    const ARCH_T = AREA_BY_NAME.ARCHITECTURES.t, EXH_T = AREA_BY_NAME.EXHIBITIONS.t;
     for (let f = 0; f < TOTAL; f++) {
       const t = f * dt;
       pointsUniforms.uTime.value = t;
+      let capArea = null, capW = 0;
 
-      if (t < 2.6) {
+      if (t < 4.0) {
         /* ① マクロの一輪。息づくだけで動かない（ここで十分に溜める） */
         rig.entered = false;
         camera.position.set(
@@ -3734,10 +3871,20 @@ if (TRAILER) {
         camera.lookAt(HERO_HEAD);
       } else {
         /* ② 綿毛が離れ、旅が始まり、③ 霧を抜けて ④ 情景に着いて止まる。
-           終盤は目標を動かさず、カメラが自分で追いついて静止する＝着地の間 */
+           ARCHITECTURES と EXHIBITIONS では旅を一旦止め、下層カルーセルを
+           開いて写真が流れる様子まで見せる。それ以外は通過するだけ */
         rig.entered = true; rig.started = true;
-        rig.target = ease(seg(t, 2.6, 8.4)) * 0.50;
-        updateCamera(dt);
+        const spot = findRoomSpot(t);
+        if (spot) {
+          capArea = updateRoomSpot(spot, t, dt);
+          capW = 1;
+        } else {
+          if (t < 11.0) rig.target = ease(seg(t, 4.0, 11.0)) * ARCH_T;
+          else if (t < 22.5) rig.target = ARCH_T + ease(seg(t, 15.5, 22.5)) * (EXH_T - ARCH_T);
+          else rig.target = EXH_T;
+          const r = updateCamera(dt);
+          capArea = r.capArea; capW = r.capW;
+        }
       }
       updateFluff(t, dt);
       updatePanels();
@@ -3757,9 +3904,10 @@ if (TRAILER) {
         cx.restore();
       }
       drawVeil((rig.veil || 0) * 0.85);
+      drawAreaCaption(capArea, capW);
       /* 終わりは紙そのものに還す。移動中の霧は中心を抜く作りなので、
          そのまま流用すると署名の真下だけ情景が透けてしまう。ここは平らに敷く */
-      const endWhite = ease(seg(t, 8.6, 9.45)) * 0.96;
+      const endWhite = ease(seg(t, 26.3, 27.6)) * 0.96;
       if (endWhite > 0.002) {
         cx.fillStyle = `rgba(244,242,236,${endWhite.toFixed(3)})`;
         cx.fillRect(0, 0, W, H);
@@ -3767,8 +3915,11 @@ if (TRAILER) {
       drawType(t);
 
       const blob = await new Promise((r) => cap.toBlob(r, "image/jpeg", 0.94));
-      await fetch(`/frame/${String(f).padStart(5, "0")}.jpg`, { method: "POST", body: blob });
+      const req = fetch(`/frame/${String(f).padStart(5, "0")}.jpg`, { method: "POST", body: blob });
+      pending.push(req);
+      if (pending.length >= MAX_INFLIGHT) await pending.shift();
     }
+    await Promise.all(pending);
     document.title = `TRAILER DONE ${TOTAL}`;
   }
   /* シーンが組み上がってから撮り始める */

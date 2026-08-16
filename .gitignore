@@ -8,6 +8,7 @@ webgl-bg.js
 # トレーラー撮影モード（?trailer=1）の作業出力。サイトの動作には不要
 trailer-frames/
 common-trailer.mp4
+common-trailer-vertical.mp4
 
 # OS/エディタ
 .DS_Store
