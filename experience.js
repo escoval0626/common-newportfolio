@@ -3419,6 +3419,37 @@ const dots = AREAS.map((a) => {
   return b;
 });
 
+/* ロゴ＝サイトの入口。クリックで旅の最初（綿毛が離脱する場面）へ戻る。
+   index.html を切り離した今、experience.html だけで完結するポートフォリオ
+   として機能する必要があり、どこにいても頭に戻れる導線が要る */
+const hudLogo = document.getElementById("hudLogo");
+if (hudLogo) {
+  hudLogo.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (!rig.entered) return; /* ENTER前は押しても何もしない（旅がまだ始まっていない） */
+    if (galleryOpen) closeGallery();
+    rig.started = true;
+    rig.target = 0;
+    rig.lastInput = performance.now();
+    hint.classList.remove("is-faded");
+  });
+}
+
+/* CONTACTへの常設ショートカット。以前は問い合わせ先が旅の最後（進行度97%）
+   にしか無く、興味を持った訪問者がそこまで毎回旅をやり直す必要があった */
+const hudContact = document.getElementById("hudContact");
+if (hudContact) {
+  hudContact.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (!rig.entered) return;
+    if (galleryOpen) closeGallery();
+    rig.started = true;
+    rig.target = CONTACT_T;
+    rig.lastInput = performance.now();
+    hint.classList.add("is-faded");
+  });
+}
+
 const loadTick = setInterval(() => {
   const real = Math.round((loadedCount / totalCount) * 100);
   loaderStatus.textContent = `LOADING ${real}%`;
@@ -3443,7 +3474,29 @@ enterBtn.addEventListener("click", () => {
      マクロショットの姿勢のまま同一クリックがレイキャストに流れ、
      カメラの呼吸位相によっては ABOUT のピック判定に入って旅が勝手に始まってしまう。
      1フレーム遅らせ、このクリックの伝播が完全に終わってから有効化する */
-  requestAnimationFrame(() => { rig.entered = true; });
+  requestAnimationFrame(() => {
+    rig.entered = true;
+    /* URLに情景のハッシュ（#plants 等、updateUrlHash が着地時に付ける）が
+       付いていれば、共有されたリンクとしてそこへ着地する。
+       まっさらな訪問（ハッシュ無し）はいつも通り冒頭から始まる。
+       最初は rig.target だけ動かしていたが、それだと rig.progress が
+       0から目的地まで通常のスクロール速度で連続的に動き、旅の全行程を
+       早送りで見せられているような違和感になっていた。progress 自体を
+       直接その場へ置き、代わりに霧を一瞬濃くして「霧の中から現れる」
+       演出（updateCamera が毎フレーム自然に晴らしていく、着地時と同じ絵）
+       に差し替える */
+    const hashName = location.hash.slice(1).toLowerCase();
+    const shared = hashName && AREAS.find((a) => a.name.toLowerCase() === hashName);
+    if (shared) {
+      rig.started = true;
+      rig.progress = shared.t;
+      rig.target = shared.t;
+      rig.veil = 0.85;
+      if (fogVeil) fogVeil.style.opacity = "0.85";
+      rig.lastInput = performance.now();
+      hint.classList.add("is-faded");
+    }
+  });
   /* 霧は以降 updateCamera が動的に駆動（移動＝乳白の谷／情景＝晴れる）。
      初期の高密度から自動で薄まっていく＝入場のリビール */
 });
@@ -3471,6 +3524,31 @@ function updateHud(capArea, capW) {
     d.setAttribute("aria-current", isActive ? "true" : "false");
   });
   progressBar.style.width = `${rig.progress * 100}%`;
+  /* 部屋の中（別の「戻る」導線がある）と、既にCONTACTにいる間は隠す。
+     それ以外は常に出しておき、どこからでも1クリックで問い合わせ先へ行ける */
+  if (hudContact) {
+    const hideContact = !!activeRoom || !!galleryOpen || (active && active.name === "CONTACT");
+    hudContact.classList.toggle("is-hidden", hideContact);
+    /* opacity:0 + pointer-events:none はマウスのヒットテストしか塞がない。
+       Tabで見えないボタンにフォーカスが乗り、Enterで部屋の外へ飛ばされて
+       いた（.hud__back と違い、こちらは closeGallery 等のガードが無いため
+       実際にナビゲーションが起きる）。隠す時は確実に踏めないようにする */
+    hudContact.tabIndex = hideContact ? -1 : 0;
+  }
+  updateUrlHash(capArea, capW);
+}
+
+/* URLで直接その情景を共有できるようにする。着地した（capWが高い）情景の
+   名前をハッシュに反映し、次に開いた時はそのハッシュを見て自動的に旅する */
+let shownHashArea = null;
+function updateUrlHash(capArea, capW) {
+  const target = capArea && capW > 0.6 ? capArea : null;
+  if (target === shownHashArea) return;
+  shownHashArea = target;
+  const hash = target ? "#" + target.name.toLowerCase() : "";
+  if (location.hash !== hash) {
+    history.replaceState(null, "", location.pathname + location.search + hash);
+  }
 }
 
 /* ---------- resize / loop ---------- */

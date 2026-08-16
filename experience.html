@@ -271,7 +271,13 @@
       display: flex; justify-content: space-between; align-items: center;
       padding: 24px clamp(20px, 4vw, 56px);
     }
-    .hud__logo { font-size: 13px; letter-spacing: 0.2em; color: var(--ink); }
+    .hud__logo {
+      font-size: 13px; letter-spacing: 0.2em; color: var(--ink);
+      background: none; border: 0; padding: 0; font-family: inherit; cursor: pointer;
+      transition: color 0.3s;
+      pointer-events: auto; /* .hud は全体が pointer-events:none。これが無いと押せない */
+    }
+    .hud__logo:hover, .hud__logo:focus-visible { color: var(--ink-dim); }
     .hud__head-right { display: flex; align-items: center; gap: clamp(16px, 2.4vw, 28px); }
     /* 部屋（写真の一覧）にいる間だけ現れる「戻る」ボタン。ESCキー任せにしない。
        枚数表示（旧 .hud__room-pos）と並べていたモバイル幅では、
@@ -285,6 +291,18 @@
     }
     .hud__back.is-visible { opacity: 1; pointer-events: auto; }
     .hud__back:hover { color: var(--ink); }
+    /* CONTACTへの常設ショートカット。旅を最後まで進めなくても問い合わせ先に
+       すぐ辿り着けるよう、HUDに常時置いておく（部屋の中や、まさにCONTACTに
+       いる間は自明・過剰なので隠す） */
+    .hud__contact {
+      background: none; border: 0; padding: 0; margin: 0; cursor: pointer;
+      font-family: var(--font-latin); font-size: 11px; letter-spacing: 0.3em;
+      color: var(--ink-mid); white-space: nowrap;
+      transition: color 0.3s, opacity 0.3s;
+      pointer-events: auto; /* .hud は全体が pointer-events:none。これが無いと押せない */
+    }
+    .hud__contact:hover, .hud__contact:focus-visible { color: var(--ink); }
+    .hud__contact.is-hidden { opacity: 0; pointer-events: none; }
     /* SNS：細い線の円だけの控えめなアイコン。常時表示 */
     .hud__social { display: flex; align-items: center; gap: 10px; }
     .hud__social-link {
@@ -598,10 +616,15 @@
       /* ロゴ＋「← BACK TO JOURNEY」＋SNSの合計が画面幅を46px超え、
          ロゴへ詰まって重なって見えたりSNSが画面外に押し出されていた。
          レターイングを詰めて幅を作る */
-      .hud__head { padding: 20px 16px; }
+      .hud__head { padding: 20px 10px; }
       .hud__logo { font-size: 12px; letter-spacing: 0.1em; }
-      .hud__head-right { gap: 10px; }
+      .hud__head-right { gap: 5px; }
       .hud__back { font-size: 9.5px; letter-spacing: 0.12em; }
+      /* CONTACTボタン追加で合計幅が再び超過（375px幅で実測+35px。
+         .hud__back は非表示時も "← BACK TO JOURNEY" 分の幅をレイアウトに
+         持ち続けるため、CONTACT追加分がそのまま超過になっていた）。
+         padding/gapも詰めた上で、これ自体もさらに縮める */
+      .hud__contact { font-size: 8px; letter-spacing: 0.06em; }
 
       /* タップ領域をWCAG目安の44pxまで拡げる。見た目のドット自体は
          疑似要素で小さく描き、視覚的な印象は変えない */
@@ -700,9 +723,10 @@
   <!-- HUD -->
   <div class="hud" id="hud">
     <div class="hud__head">
-      <p class="hud__logo">COMMON<sup>©</sup></p>
+      <button class="hud__logo" id="hudLogo" type="button" aria-label="旅の最初に戻る">COMMON<sup>©</sup></button>
       <div class="hud__head-right">
         <button class="hud__back" id="roomBack" type="button">← BACK TO JOURNEY</button>
+        <button class="hud__contact" id="hudContact" type="button">CONTACT</button>
         <div class="hud__social">
           <a class="hud__social-link" href="https://www.instagram.com/common_ordinarydays/" target="_blank" rel="noopener noreferrer" aria-label="Instagram">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6">
