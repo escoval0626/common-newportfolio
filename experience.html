@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Common — Sho Kitago</title>
+  <meta name="description" content="Common — 写真家 北郷 将 のポートフォリオ" />
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
+
+  <!-- OGP / Twitter Card。og:url・og:imageの絶対パスはデプロイ先ドメイン確定後に差し替え -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Common — Sho Kitago" />
+  <meta property="og:title" content="Common — Sho Kitago" />
+  <meta property="og:description" content="Common — 写真家 北郷 将 のポートフォリオ" />
+  <meta property="og:image" content="assets/photos/xp/landscape.jpg" />
+  <meta property="og:locale" content="ja_JP" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Common — Sho Kitago" />
+  <meta name="twitter:description" content="Common — 写真家 北郷 将 のポートフォリオ" />
+  <meta name="twitter:image" content="assets/photos/xp/landscape.jpg" />
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Person",
+    "name": "Sho Kitago",
+    "alternateName": "北郷 将",
+    "jobTitle": "Photographer",
+    "url": "",
+    "email": "mailto:escoval0626@gmail.com",
+    "address": { "@type": "PostalAddress", "addressLocality": "Nagareyama", "addressRegion": "Chiba", "addressCountry": "JP" },
+    "sameAs": [
+      "https://www.instagram.com/common_ordinarydays/",
+      "https://note.com/common0626"
+    ]
+  }
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=Josefin+Sans:wght@200;300;400&family=Zen+Old+Mincho:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #f7f6f2;
+      --ink: #1c1c1c;
+      --ink-mid: #55534e;
+      --ink-dim: #97948d;
+      --line: #e0dedb;
+      --font-latin: "Josefin Sans", sans-serif;
+      --font-jp: "Zen Old Mincho", serif;
+      --font-display: "Cormorant Garamond", serif;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; overflow: hidden; background: var(--bg); overscroll-behavior: none; }
+    /* キーボード操作時だけフォーカスの所在を示す（マウスクリックでは出さない） */
+    :where(button, a, [tabindex]):focus-visible {
+      outline: 2px solid var(--ink);
+      outline-offset: 3px;
+      border-radius: 2px;
+    }
+    body {
+      font-family: var(--font-latin); font-weight: 300; color: var(--ink);
+      -webkit-font-smoothing: antialiased;
+      cursor: grab;
+    }
+    body.dragging { cursor: grabbing; }
+    /* touch-action:none が無いと、Androidで下方向ドラッグがpull-to-refreshに
+       吸われ、旅を戻そうとした操作でページごと再読込されることがある */
+    canvas.xp-canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+    .bg-video {
+      position: fixed; inset: 0; z-index: 1;
+      width: 100%; height: 100%;
+      object-fit: cover;
+      pointer-events: none;
+      mix-blend-mode: multiply;
+      opacity: 0.34;
+      filter: grayscale(1) contrast(0.95) brightness(1.06);
+    }
+    /* 一旦、背景動画は非表示（マークアップは残置・戻す時はこの行を消す） */
+    .bg-video { display: none !important; }
+    .bg-video:not([data-ok]) { display: none; } /* 動画が無ければ静かに消える */
+    .paper-fx {
+      position: fixed; inset: 0; z-index: 2;
+      pointer-events: none;
+      mix-blend-mode: multiply;
+      opacity: 0.55;
+      background-repeat: repeat;
+    }
+    /* ===== 谷の詩：霧が閉じた"何も見えない渡り"に、1行だけ漂う言葉 =====
+       ヴェールの上に出るので白ハローは付けない（付けると野暮になる）。
+       画面中央を外し、右寄り・やや上に置いて余白を残す。 */
+    .valley-line {
+      position: fixed; z-index: 5; pointer-events: none;
+      right: clamp(10%, 15vw, 24%); top: 15%;
+      writing-mode: vertical-rl; text-orientation: mixed;
+      font-family: var(--font-jp); font-weight: 400;
+      font-size: clamp(16px, 1.45vw, 21px); letter-spacing: 0.22em; line-height: 1;
+      color: #4a453d;
+      opacity: 0;
+      will-change: opacity;
+    }
+
+    /* ===== 絵→写真の遷移：写真は"素"で立ち上がる（紙・霧・LUTを一切乗せない） ===== */
+    .photo-rise {
+      /* ギャラリーより手前に置き、着地の瞬間まで"同じ1枚"として残す（受け渡しの継続性） */
+      position: fixed; z-index: 61; pointer-events: none;
+      opacity: 0; overflow: hidden;
+      will-change: transform, filter, opacity;
+    }
+    .photo-rise img { display: block; width: 100%; height: 100%; object-fit: cover; }
+    /* 案D：簾（縦のスリットが順に開く）用のストリップ */
+    .photo-rise__slats { position: absolute; inset: 0; display: flex; }
+    .photo-rise__slat {
+      position: relative; height: 100%; flex: 1 1 0; overflow: hidden;
+      transform-origin: 50% 100%;
+    }
+    .photo-rise__slat i {
+      position: absolute; top: 0; height: 100%; display: block;
+      background-repeat: no-repeat; background-size: cover;
+    }
+
+    /* ===== 1枚を選んで見る時の見出し。誌面の扉のように、罫と余白で組む ===== */
+    .zoom-cap {
+      position: fixed; z-index: 9; pointer-events: none;
+      left: clamp(28px, 6vw, 88px); bottom: clamp(30px, 7vh, 74px);
+      opacity: 0;
+    }
+    .zoom-cap p, .zoom-cap h3 { overflow: hidden; margin: 0; }
+    .zoom-cap span { display: inline-block; }
+    .zoom-cap__num {
+      font-family: var(--font-latin); font-size: 10px; letter-spacing: 0.4em;
+      color: var(--ink-dim); margin-bottom: 10px;
+    }
+    .zoom-cap__title {
+      font-family: var(--font-display); font-weight: 300; font-style: italic;
+      font-size: clamp(28px, 3.4vw, 52px); line-height: 1.05; color: #171410;
+      padding-bottom: 0.06em;
+    }
+    .zoom-cap__meta {
+      margin-top: 14px; padding-top: 12px;
+      border-top: 1px solid rgba(30,26,20,0.22);
+      font-family: var(--font-jp); font-size: 12px; letter-spacing: 0.2em;
+      color: #4e4941;
+    }
+    .zoom-cap__hint {
+      margin-top: 20px;
+      font-family: var(--font-latin); font-size: 9px; letter-spacing: 0.36em;
+      color: var(--ink-dim);
+    }
+
+    /* ===== 下層ページ：触れた写真のキャプション。窓から出るように現す ===== */
+    .room-cap {
+      position: fixed; z-index: 8; pointer-events: none;
+      transform: translate(-50%, 0);
+      opacity: 0;
+      display: flex; align-items: baseline; gap: 12px;
+      overflow: hidden;
+    }
+    .room-cap i {
+      font-style: normal; display: block;
+      width: 22px; height: 1px; background: rgba(30,26,20,0.35);
+      transform-origin: 0 50%;
+    }
+    .room-cap span {
+      display: inline-block;
+      font-family: var(--font-jp); font-size: 12.5px; letter-spacing: 0.18em;
+      color: #2f2b25; white-space: nowrap;
+      text-shadow: 0 0 6px #f4f1ea, 0 0 12px #f4f1ea;
+    }
+
+    /* ===== ヒーロータイトル（ポートフォリオTOPのタイトルロックアップ） ===== */
+    .hero-title {
+      position: fixed; z-index: 7; pointer-events: none;
+      left: clamp(28px, 7vw, 110px); top: 9%;
+      opacity: 0; transition: opacity 0.1s linear;
+    }
+    .hero-title__mark {
+      font-family: var(--font-display); font-weight: 300;
+      font-size: clamp(52px, 8vw, 112px); line-height: 0.92;
+      letter-spacing: 0.06em; color: #171410;
+      text-shadow: 0 0 10px #f4f1ea, 0 2px 3px rgba(244,241,234,0.9);
+    }
+    .hero-title__mark em {
+      font-style: italic; font-weight: 300;
+    }
+    .hero-title__sub {
+      margin-top: 18px; padding-left: 0.3em;
+      display: flex; align-items: center; gap: 14px;
+      font-family: var(--font-latin); font-weight: 300;
+      font-size: 12px; letter-spacing: 0.42em; text-transform: uppercase;
+      color: #5f5a52;
+      text-shadow: 0 0 6px #f4f1ea;
+    }
+    .hero-title__sub::before {
+      content: ""; width: clamp(28px, 4vw, 52px); height: 1px;
+      background: rgba(30,26,20,0.4);
+    }
+
+    /* 霧のヴェール：移動中に視界を閉じる（絵の上・テキストの下）。
+       霧は"媒質"であって"遮蔽"ではない。全面均一に塗ると暗転＝ロード中に見えるため、
+       ①上限を抑えて気配を残し ②背景アイボリーとは色相で分離し（明度は近いまま）
+       ③中心を抜いて周縁を濃く＝前進感 ④2層を異なる速度で漂わせる（動かない霧は壁）。 */
+    .fog-veil {
+      position: fixed; inset: 0; z-index: 4;
+      pointer-events: none; overflow: hidden;
+      opacity: 0;
+      transition: opacity 0.1s linear;
+    }
+    .fog-veil::before, .fog-veil::after {
+      content: ""; position: absolute; inset: -25%;
+      /* 背景(#f7f6f2 の暖色)に対し、わずかに寒色・ペールセージ寄りの乳白で層を作る */
+      background:
+        radial-gradient(58% 58% at 50% 45%,
+          rgba(238,241,234,0.10) 0%,
+          rgba(236,239,232,0.58) 42%,
+          rgba(233,237,230,0.90) 72%,
+          rgba(231,235,228,1.0) 100%);
+      will-change: transform;
+    }
+    .fog-veil::before { animation: fogDriftA 34s ease-in-out infinite; }
+    .fog-veil::after  { animation: fogDriftB 53s ease-in-out infinite; opacity: 0.6; }
+    @keyframes fogDriftA {
+      0%, 100% { transform: translate3d(-1.5%, 0.8%, 0) scale(1.04); }
+      50%      { transform: translate3d(2.2%, -1.4%, 0) scale(1.10); }
+    }
+    @keyframes fogDriftB {
+      0%, 100% { transform: translate3d(2.4%, -1.0%, 0) scale(1.12); }
+      50%      { transform: translate3d(-2.0%, 1.6%, 0) scale(1.05); }
+    }
+
+    /* ===== LOADER（本家 loader-experience のUX構造を踏襲） ===== */
+    .loader {
+      position: fixed; inset: 0; z-index: 100;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 26px; background: var(--bg);
+      transition: opacity 1.1s ease, visibility 1.1s;
+    }
+    .loader.is-hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+    .loader__brand { font-size: 11px; letter-spacing: 0.4em; color: var(--ink-dim); }
+    .loader__status { font-size: 13px; letter-spacing: 0.34em; color: var(--ink); min-height: 1.4em; }
+    .loader__bar {
+      width: min(220px, 60vw); height: 1px; background: rgba(30, 26, 20, 0.18);
+      overflow: hidden;
+    }
+    .loader__bar span {
+      display: block; height: 100%; width: 0%;
+      background: var(--ink-mid); transition: width 0.3s ease;
+    }
+    .loader__desc {
+      font-family: var(--font-jp); font-size: 14px; letter-spacing: 0.18em;
+      color: var(--ink-mid); text-align: center; line-height: 2.2; max-width: 34em;
+      padding: 0 24px;
+    }
+    .loader__enter {
+      margin-top: 12px; padding: 16px 54px;
+      background: none; border: 1px solid var(--ink); color: var(--ink);
+      font-family: var(--font-latin); font-size: 12px; letter-spacing: 0.4em;
+      cursor: pointer; opacity: 0; pointer-events: none;
+      transition: opacity 0.8s, background 0.35s, color 0.35s;
+    }
+    .loader__enter.is-ready { opacity: 1; pointer-events: auto; }
+    .loader__enter:hover { background: var(--ink); color: var(--bg); }
+
+    /* ===== HUD ===== */
+    .hud { position: fixed; inset: 0; z-index: 10; pointer-events: none; opacity: 0; visibility: hidden; transition: opacity 1.4s ease 0.6s; }
+    /* ローダー表示中、hud__social-linkがpointer-events:autoで上書きしているため
+       Tabキーで不可視のSNSリンクにフォーカスが飛んでしまう。visibilityで塞ぐ */
+    .hud.is-active { opacity: 1; visibility: visible; }
+    .hud__head {
+      position: absolute; top: 0; left: 0; right: 0;
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 24px clamp(20px, 4vw, 56px);
+    }
+    .hud__logo { font-size: 13px; letter-spacing: 0.2em; color: var(--ink); }
+    .hud__head-right { display: flex; align-items: center; gap: clamp(16px, 2.4vw, 28px); }
+    /* 部屋（写真の一覧）にいる間だけ現れる「戻る」ボタン。ESCキー任せにしない。
+       枚数表示（旧 .hud__room-pos）と並べていたモバイル幅では、
+       nowrap が無いと3行に折り返してみっともなかったため単独でも防いでおく */
+    .hud__back {
+      background: none; border: 0; padding: 0; margin: 0; cursor: pointer;
+      font-family: var(--font-latin); font-size: 11px; letter-spacing: 0.3em;
+      color: var(--ink-mid); white-space: nowrap;
+      opacity: 0; pointer-events: none;
+      transition: color 0.3s, opacity 0.3s;
+    }
+    .hud__back.is-visible { opacity: 1; pointer-events: auto; }
+    .hud__back:hover { color: var(--ink); }
+    /* SNS：細い線の円だけの控えめなアイコン。常時表示 */
+    .hud__social { display: flex; align-items: center; gap: 10px; }
+    .hud__social-link {
+      width: 26px; height: 26px; border-radius: 50%;
+      border: 1px solid var(--ink-dim); color: var(--ink-mid);
+      display: flex; align-items: center; justify-content: center;
+      pointer-events: auto; text-decoration: none;
+      transition: border-color 0.3s, color 0.3s;
+    }
+    .hud__social-link:hover { border-color: var(--ink); color: var(--ink); }
+    .hud__social-link svg { display: block; }
+    .hud__social-link--note { font-family: var(--font-display); font-style: italic; font-size: 13px; line-height: 1; }
+
+    .hud__caption {
+      position: absolute; left: clamp(20px, 4vw, 56px); bottom: clamp(24px, 6vh, 60px);
+      opacity: 0; transform: translateY(14px);
+      transition: opacity 0.7s ease, transform 0.7s ease;
+    }
+    .hud__caption.is-visible { opacity: 1; transform: translateY(0); }
+    .hud__caption-num { font-size: 10px; letter-spacing: 0.34em; color: var(--ink-dim); margin-bottom: 10px; }
+    .hud__caption-title { font-size: clamp(26px, 4vw, 44px); font-weight: 200; letter-spacing: 0.1em; text-transform: uppercase; }
+
+    /* 進行ドット（クリックでそのエリアへ滑走） */
+    .hud__dots {
+      position: absolute; right: clamp(18px, 3vw, 44px); top: 50%; transform: translateY(-50%);
+      display: flex; flex-direction: column; gap: 18px; pointer-events: auto;
+    }
+    .hud__dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      border: 1px solid var(--ink-dim); background: transparent;
+      cursor: pointer; padding: 0;
+      transition: background 0.4s, border-color 0.4s, transform 0.4s;
+    }
+    .hud__dot.is-active { background: var(--ink); border-color: var(--ink); transform: scale(1.4); }
+    /* ドットだけでは名前が読めず、8枚を巡る全体像が掴みにくかった。
+       ホバーで左側にエリア名を出す（常時表示だと右端の余白が煩雑になる） */
+    .hud__dot-wrap { position: relative; display: flex; align-items: center; justify-content: flex-end; }
+    .hud__dot-label {
+      position: absolute; right: calc(100% + 12px); top: 50%;
+      transform: translateY(-50%) translateX(6px);
+      font-family: var(--font-latin); font-size: 9px; letter-spacing: 0.22em;
+      color: var(--ink-mid); white-space: nowrap;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+    .hud__dot-wrap:hover .hud__dot-label { opacity: 1; transform: translateY(-50%) translateX(0); }
+
+    .hud__hint {
+      position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%);
+      font-size: 12px; letter-spacing: 0.32em; color: var(--ink-mid);
+      transition: opacity 1s;
+      /* absolute配置＋幅指定なしの複数行テキストは shrink-to-fit の
+         計算が安定せず、"SCROL" "L" のように英単語の途中で割れて
+         折り返っていた。nowrap にして自動折返しを止め、改行は
+         明示的な <br class="hud__hint__br">（モバイルでだけ有効）に任せる */
+      max-width: 90vw; text-align: center; white-space: nowrap;
+    }
+    .hud__hint.is-faded { opacity: 0; }
+    .hud__hint__br { display: none; }
+
+    .hud__progressbar {
+      position: absolute; left: 0; bottom: 0; height: 2px; width: 100%;
+      background: var(--line);
+    }
+    .hud__progressbar span { display: block; height: 100%; width: 0%; background: var(--ink); }
+
+    /* ===== 3D追従アンカー（奥行きボケするテキスト） ===== */
+    .anchors { position: fixed; inset: 0; z-index: 6; pointer-events: none; overflow: hidden; }
+    .xp-line {
+      position: absolute; left: 0; top: 0;
+      font-family: var(--font-jp); font-size: 24px; letter-spacing: 0.14em;
+      color: #16130f; white-space: nowrap;
+      opacity: 0;
+      /* 絵の上でも読めるよう白ハローで縁取り */
+      text-shadow: 0 0 6px #f2efe8, 0 0 12px #f2efe8, 0 0 3px #f2efe8, 0 1px 2px rgba(242,239,232,0.9);
+      will-change: transform, filter, opacity;
+    }
+    .xp-hotspot {
+      position: absolute; left: 0; top: 0;
+      display: inline-flex; align-items: baseline; gap: 7px;
+      /* <button> 化に伴うデフォルト見た目のリセット */
+      background: none; border: 0; padding: 0; margin: 0;
+      font-family: var(--font-latin); font-size: 13px; letter-spacing: 0.16em;
+      color: #2a2620; white-space: nowrap;
+      cursor: pointer; pointer-events: auto;
+      opacity: 0;
+      text-shadow: 0 0 6px #f2efe8, 0 0 10px #f2efe8;
+      will-change: transform, filter, opacity;
+      transition: color 0.3s;
+    }
+    .xp-hotspot:hover { color: var(--ink); }
+    /* 下線はホバー待ちにせず、常に静かに息をして「触れられる」ことを伝える。
+       筆で引いた線のように左から現れ、また薄れる＝ギャラリー見出しの罫と同じ語彙 */
+    .xp-hotspot__label { position: relative; padding-bottom: 4px; }
+    .xp-hotspot__label::after {
+      content: ""; position: absolute; left: 0; right: 0; bottom: 0;
+      height: 1px; background: currentColor; transform-origin: 0 50%;
+      animation: hotspotBreathe 3.8s ease-in-out infinite;
+    }
+    .xp-hotspot:hover .xp-hotspot__label::after { animation-play-state: paused; transform: scaleX(1); opacity: 1; }
+    @keyframes hotspotBreathe {
+      0%, 100% { transform: scaleX(0.6); opacity: 0.45; }
+      50% { transform: scaleX(1); opacity: 0.95; }
+    }
+    /* CONTACTはラベルが長く（メールアドレス込み）、呼吸の振れ幅が
+       他エリアの3倍近くになって下線が不安定に見えるため、揺れを止める */
+    .xp-hotspot--static .xp-hotspot__label::after {
+      animation: none; transform: scaleX(1); opacity: 0.55;
+    }
+    .xp-hotspot--static:hover .xp-hotspot__label::after { opacity: 1; }
+    /* 矢印はホバー時だけ、誘うようにひと揺れ */
+    .xp-hotspot__arrow { display: inline-block; transition: transform 0.4s ease; }
+    .xp-hotspot:hover .xp-hotspot__arrow { transform: translateX(4px); }
+
+    /* ===== コピーボックス：3D投影のまま、日本語=縦組み／英訳=横組みを一つの箱に ===== */
+    .xp-copy {
+      position: absolute; left: 0; top: 0;
+      display: inline-flex; flex-direction: column; align-items: flex-start;
+      gap: 16px;
+      opacity: 0;
+      will-change: transform, filter, opacity;
+    }
+    .xp-copy__jp {
+      display: flex; flex-direction: row-reverse; align-items: flex-start;
+      gap: 0.55em;
+    }
+    .xp-copy__col {
+      writing-mode: vertical-rl; text-orientation: mixed;
+      font-family: var(--font-jp); font-weight: 500;
+      font-size: 25px; letter-spacing: 0.16em; line-height: 1;
+      color: #16130f; white-space: nowrap;
+      text-shadow: 0 0 6px #f2efe8, 0 0 12px #f2efe8, 0 0 3px #f2efe8, 0 1px 2px rgba(242,239,232,0.9);
+    }
+    .xp-copy__en {
+      font-family: var(--font-latin); font-weight: 400;
+      font-size: 12.5px; letter-spacing: 0.16em; text-transform: uppercase;
+      color: #322e28; white-space: nowrap;
+      padding-left: 0.2em; border-top: 1px solid rgba(30,26,20,0.28); padding-top: 10px;
+      /* 絵の上でも読めるよう白ハローを強めに */
+      text-shadow: 0 0 5px #f4f1ea, 0 0 10px #f4f1ea, 0 0 2px #f4f1ea, 0 1px 1px rgba(244,241,234,0.95);
+    }
+
+    /* ===== CONTACT：詩コピーの下に、見出し・実メール・SNSへの導線を添える ===== */
+    .xp-contact-extra {
+      margin-top: 6px; padding-top: 18px;
+      border-top: 1px solid rgba(30,26,20,0.2);
+      display: flex; flex-direction: column; align-items: flex-start; gap: 14px;
+    }
+    .xp-contact-extra__headline {
+      font-family: var(--font-display); font-weight: 300; font-style: italic;
+      font-size: clamp(26px, 3vw, 38px); color: #171410; line-height: 1;
+      text-shadow: 0 0 6px #f2efe8, 0 0 14px #f2efe8, 0 0 3px #f2efe8, 0 1px 2px rgba(242,239,232,0.9);
+    }
+    .xp-contact-extra__lead {
+      font-family: var(--font-jp); font-size: 14px; letter-spacing: 0.06em;
+      color: #2a2620; line-height: 1.8; margin-top: -6px;
+      text-shadow: 0 0 6px #f2efe8, 0 0 10px #f2efe8;
+    }
+    /* モバイル幅で「相談」が割れて改行されるのを防ぐための明示的な改行。
+       PCはコンテナが広く1行に収まるので、常時有効にすると逆に2行になって
+       下のホットスポットと縦に近づいてしまうため、PCでは無効化する */
+    .xp-contact-extra__br { display: none; }
+    .xp-contact-extra__lead-en {
+      font-family: var(--font-latin); font-style: italic;
+      font-size: 11px; letter-spacing: 0.03em; color: var(--ink-mid);
+      margin-top: -8px;
+      text-shadow: 0 0 6px #f2efe8, 0 0 10px #f2efe8;
+    }
+
+    /* ===== ABOUT：自己紹介カット（名前・肩書＋長文バイオ＋展示歴）
+       他の情景と同じ「箱を作らず、白ハローで空間に浮かせる」方式に統一 ===== */
+    .xp-copy--about { gap: 0; width: min(640px, 90vw); }
+    .xp-about__name {
+      font-family: var(--font-jp); font-weight: 500;
+      font-size: 18px; letter-spacing: 0.1em; color: #16130f;
+      text-shadow: 0 0 6px #f2efe8, 0 0 12px #f2efe8, 0 1px 2px rgba(242,239,232,0.9);
+    }
+    .xp-about__name span {
+      font-family: var(--font-latin); font-weight: 300;
+      font-size: 12px; letter-spacing: 0.22em; color: #4a463f; margin-left: 0.7em;
+    }
+    .xp-about__role {
+      font-family: var(--font-latin); font-weight: 300;
+      font-size: 10px; letter-spacing: 0.24em; text-transform: uppercase;
+      color: #6a655c;
+      text-shadow: 0 0 6px #f2efe8, 0 0 10px #f2efe8;
+      margin-top: 5px; margin-bottom: 22px;
+    }
+    /* 日本語列・英語列を左右に並べる（縦に積むと画面の高さを大きく超えるため） */
+    .xp-about__bio-row { display: flex; align-items: flex-start; }
+    .xp-about__bio, .xp-about__bio-en { flex: 1 1 0; min-width: 0; }
+    .xp-about__bio {
+      display: flex; flex-direction: column; gap: 14px;
+    }
+    .xp-about__bio p {
+      font-family: var(--font-jp); font-weight: 500;
+      font-size: 12px; line-height: 1.95; letter-spacing: 0.03em;
+      color: #16130f;
+      text-shadow: 0 0 6px #f2efe8, 0 0 12px #f2efe8, 0 0 3px #f2efe8, 0 1px 2px rgba(242,239,232,0.9);
+    }
+    .xp-about__bio-en {
+      margin-left: 36px; padding-left: 36px;
+      border-left: 1px solid rgba(30,26,20,0.24);
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .xp-about__bio-en p {
+      font-family: var(--font-latin); font-weight: 300;
+      font-size: 10.5px; line-height: 1.85; letter-spacing: 0.015em;
+      color: #3a362f;
+      text-shadow: 0 0 5px #f4f1ea, 0 0 10px #f4f1ea, 0 0 2px #f4f1ea, 0 1px 1px rgba(244,241,234,0.95);
+    }
+    .xp-about__exhibitions {
+      margin-top: 12px; padding-top: 16px;
+      border-top: 1px solid rgba(30,26,20,0.24);
+    }
+    .xp-about__exhibitions h4 {
+      font-family: var(--font-latin); font-weight: 400; font-size: 9.5px;
+      letter-spacing: 0.28em; text-transform: uppercase; color: #6a655c;
+      text-shadow: 0 0 6px #f2efe8, 0 0 10px #f2efe8;
+      margin-bottom: 10px;
+    }
+    .xp-about__exhibitions ul { list-style: none; }
+    .xp-about__exhibitions li {
+      font-family: var(--font-jp); font-weight: 500; font-size: 12px; letter-spacing: 0.03em;
+      color: #16130f; line-height: 1.65; margin-bottom: 7px;
+      text-shadow: 0 0 6px #f2efe8, 0 0 12px #f2efe8, 0 0 3px #f2efe8, 0 1px 2px rgba(242,239,232,0.9);
+    }
+    .xp-about__exhibitions li:last-child { margin-bottom: 0; }
+    .xp-about__exhibitions li em {
+      display: block; font-style: normal;
+      font-family: var(--font-latin); font-weight: 300; font-size: 9.5px; letter-spacing: 0.05em;
+      color: #6a655c; margin-top: 2px;
+      text-shadow: 0 0 5px #f4f1ea, 0 0 10px #f4f1ea;
+    }
+    /* ===== WebGL非対応・コンテキスト喪失時のフォールバック ===== */
+    .webgl-fallback {
+      position: fixed; inset: 0; z-index: 999;
+      display: none; flex-direction: column; align-items: center; justify-content: center;
+      gap: 18px; padding: 24px; text-align: center; background: var(--bg);
+    }
+    .webgl-fallback.is-active { display: flex; }
+    .webgl-fallback__brand { font-size: 11px; letter-spacing: 0.4em; color: var(--ink-dim); }
+    .webgl-fallback__msg {
+      font-family: var(--font-jp); font-size: 14px; line-height: 1.9;
+      max-width: 32em; color: var(--ink-mid);
+    }
+    .webgl-fallback__link {
+      font-size: 12px; letter-spacing: 0.12em; color: var(--ink);
+      border-bottom: 1px solid var(--ink-mid); padding-bottom: 2px; text-decoration: none;
+      transition: border-color 0.3s;
+    }
+    .webgl-fallback__link:hover { border-color: var(--ink); }
+
+    /* ===== クレジット（CC-BY表記） ===== */
+    .hud__credits {
+      position: absolute; right: clamp(18px, 3vw, 44px); bottom: 12px;
+      font-size: 8px; letter-spacing: 0.14em; color: var(--ink-dim);
+      opacity: 0.75;
+    }
+
+    /* ===== 波線スクロールインジケーター ===== */
+    .hud__wave {
+      position: absolute; left: 50%; bottom: 44px; transform: translateX(-50%);
+      width: 46px; height: 14px; overflow: hidden; opacity: 0.7;
+    }
+    .hud__wave svg { display: block; animation: waveSlide 2.2s linear infinite; }
+    @keyframes waveSlide { from { transform: translateX(0); } to { transform: translateX(-23px); } }
+
+    /* ===== モバイル・タブレット：@media クエリがこれまで1件も無く、
+       詩コピーの英訳が両側にはみ出す／ABOUTの2カラムが数十px幅に潰れる／
+       ドットとSNSアイコンがタップ領域(8px, 26px)未満、等の破綻があった ===== */
+    @media (max-width: 767px) {
+      /* デスクトップは冒頭詩コピーとの重なりを避けて9%へ上げたが、モバイルは
+         元々重ならない（xp-copyの箱が78vw制限で小さくなるため）ので従来位置を維持 */
+      .hero-title { top: 21%; }
+      /* コピーは折り返す。3D投影の位置決めは変えず、箱の幅だけ制限する */
+      .xp-copy { max-width: 78vw; }
+      .xp-copy__en { white-space: normal; line-height: 1.7; font-size: 11px; }
+      .xp-copy__col { font-size: 19px; }
+
+      /* ABOUTは日英2カラムだと数十px幅に潰れるので、縦積みに切り替える。
+         Practice分を削って情報量を減らし、フォントも詰めて、
+         スクロール無しで画面の高さに収まるようにする */
+      .xp-copy--about { width: 86vw; }
+      .xp-about__bio-row { flex-direction: column; }
+      .xp-about__bio-en {
+        margin-left: 0; padding-left: 0; border-left: 0;
+        margin-top: 14px; padding-top: 14px;
+        border-top: 1px solid rgba(30, 26, 20, 0.24);
+      }
+      .xp-about__name { font-size: 16px; }
+      .xp-about__bio { gap: 10px; }
+      .xp-about__bio p { font-size: 12px; line-height: 1.6; }
+      .xp-about__bio-en { gap: 7px; }
+      .xp-about__bio-en p { font-size: 10.5px; line-height: 1.55; }
+      /* 展示歴はモバイルでは省く。スクロール無しで画面に収めるための
+         コンテンツ量調整で、バイオ本文を優先する */
+      .xp-about__exhibitions { display: none; }
+
+      /* CONTACTの「相談」が割れないための改行はモバイルでだけ有効にする */
+      .xp-contact-extra__br { display: inline; }
+      /* hud__hint も同様に、モバイルでだけ2行への改行を有効にする。
+         white-space は nowrap のままにし、<br> で分けた各行の中では
+         引き続き自動折返しを禁止する（=意図しない場所で割れない） */
+      .hud__hint__br { display: inline; }
+      /* hint が2行（34px）になると上端が波線（bottom:44px、上端58px）に
+         達して重なるため、波線をさらに上へ逃がす。hint が1行の時は
+         余白が少し増えるだけで実害はない */
+      .hud__wave { bottom: 64px; }
+
+      /* ロゴ＋「← BACK TO JOURNEY」＋SNSの合計が画面幅を46px超え、
+         ロゴへ詰まって重なって見えたりSNSが画面外に押し出されていた。
+         レターイングを詰めて幅を作る */
+      .hud__head { padding: 20px 16px; }
+      .hud__logo { font-size: 12px; letter-spacing: 0.1em; }
+      .hud__head-right { gap: 10px; }
+      .hud__back { font-size: 9.5px; letter-spacing: 0.12em; }
+
+      /* タップ領域をWCAG目安の44pxまで拡げる。見た目のドット自体は
+         疑似要素で小さく描き、視覚的な印象は変えない */
+      .hud__dots { gap: 4px; }
+      .hud__dot {
+        width: 44px; height: 44px; border: 0; background: none;
+        display: grid; place-items: center; transform: none;
+      }
+      /* PC版の .hud__dot.is-active（クラス2つでこちらより詳細度が高い）が
+         background と transform: scale(1.4) を持つため、これを打ち消さないと
+         ボタン本体（44px）ごと61.6pxの黒い円に膨れて見えてしまっていた */
+      .hud__dot.is-active { background: none; transform: none; }
+      .hud__dot::after {
+        content: ""; width: 8px; height: 8px; border-radius: 50%;
+        border: 1px solid var(--ink-dim); transition: inherit;
+      }
+      .hud__dot.is-active::after {
+        background: var(--ink); border-color: var(--ink); transform: scale(1.4);
+      }
+      .hud__social-link { width: 44px; height: 44px; }
+
+      /* 縦書き1行が画面の高さを超えるため、横書きに切り替えて中央寄せ */
+      .valley-line {
+        writing-mode: horizontal-tb; right: auto;
+        left: 50%; transform: translateX(-50%); top: 12%;
+        font-size: 15px; letter-spacing: 0.16em; text-align: center;
+      }
+    }
+    /* タッチ端末はホバー状態が「タップ後に張り付く」挙動になりやすいので、
+       ホバー前提の変化（下線の常時点灯）は最初から適用しておく */
+    @media (hover: none) {
+      .xp-hotspot__label::after { animation-play-state: paused; transform: scaleX(1); opacity: 0.75; }
+      /* タッチ環境にホバーは無く、直後の指の位置に張り付いた表示が残るだけなので出さない */
+      .hud__dot-label { display: none; }
+    }
+
+    /* 一人称視点の移動＋常時揺れるカメラ＋無限ループの装飾アニメーションが重なるため、
+       前庭障害・片頭痛・乗り物酔い体質の人には辛い可能性がある。
+       CSS側の無限ループはここで止め、JS側のカメラの揺れは REDUCE フラグで抑える */
+    @media (prefers-reduced-motion: reduce) {
+      .fog-veil::before, .fog-veil::after,
+      .xp-hotspot__label::after,
+      .hud__wave svg { animation: none !important; }
+      .xp-hotspot__label::after { transform: scaleX(1); opacity: 0.8; }
+      *, *::before, *::after { transition-duration: 0.01ms !important; }
+    }
+  </style>
+</head>
+<body>
+
+  <canvas class="xp-canvas" id="xpCanvas"></canvas>
+  <!-- WebGL非対応・コンテキスト喪失時のフォールバック -->
+  <div class="webgl-fallback" id="webglFallback" aria-hidden="true">
+    <p class="webgl-fallback__brand">COMMON — EXPERIENCE</p>
+    <p class="webgl-fallback__msg">この体験の表示に問題が発生しました。<br />ページの再読み込み、またはブラウザの更新をお試しください。</p>
+    <a class="webgl-fallback__link" href="index.html">← ポートフォリオTOPへ戻る</a>
+  </div>
+  <!-- ミニマルなループ動画（霧の揺らぎを乗算で薄く重ねる・試験導入）。
+       CSSでdisplay:none中（下のCSS参照）。autoplayがあるとdisplay:noneでも
+       ブラウザが先読みしてしまい、使ってもいない7.4MBが毎回ダウンロードされていた。
+       復活させる時はautoplay付与とpreload解除をセットで戻すこと -->
+  <video class="bg-video" id="bgVideo" muted loop playsinline preload="none">
+    <!-- 北郷さん制作の背景ループ（名称未設定のデザイン.mp4） -->
+    <source src="assets/video/bg-user.mp4?v=3" type="video/mp4" />
+  </video>
+  <!-- 水彩紙の質感（3Dキャンバスの上に乗算） -->
+  <div class="paper-fx" id="paperFx"></div>
+  <!-- 霧のヴェール：情景間の移動で乳白に閉じる（テキストより下・絵より上） -->
+  <div class="fog-veil" id="fogVeil"></div>
+  <!-- 絵が還った先の写真：絵があった画面位置から立ち上がる（遷移専用） -->
+  <div class="photo-rise" id="photoRise" aria-hidden="true"><img id="photoRiseImg" alt="" /></div>
+  <!-- 写真を1枚選んで大きく見る時の見出し（下層ページ） -->
+  <div class="zoom-cap" id="zoomCap" aria-hidden="true">
+    <p class="zoom-cap__num"><span></span></p>
+    <h3 class="zoom-cap__title"><span></span></h3>
+    <p class="zoom-cap__meta"><span></span></p>
+    <p class="zoom-cap__hint">← → SWITCH — ESC / CLICK TO RETURN</p>
+  </div>
+  <!-- 掛かった写真に触れた時のキャプション（下層ページ） -->
+  <div class="room-cap" id="roomCap" aria-hidden="true"><i></i><span></span></div>
+  <!-- ヒーロータイトル：ポートフォリオTOPのタイトル（冒頭で表示・スクロールで退場） -->
+  <div class="hero-title" id="heroTitle">
+    <div class="hero-title__mark"><em>Common</em></div>
+    <div class="hero-title__sub">Portfolio — Sho Kitago</div>
+  </div>
+
+  <!-- LOADER -->
+  <div class="loader" id="loader">
+    <p class="loader__brand">COMMON — EXPERIENCE</p>
+    <p class="loader__status" id="loaderStatus">LOADING 0%</p>
+    <div class="loader__bar"><span id="loaderBar"></span></div>
+    <p class="loader__desc">一輪のタンポポから、綿毛がひとつ旅に出ます。<br />その行方を追って、六つの風景を巡ってください。</p>
+    <button class="loader__enter" id="enterBtn">ENTER</button>
+  </div>
+
+  <!-- HUD -->
+  <div class="hud" id="hud">
+    <div class="hud__head">
+      <p class="hud__logo">COMMON<sup>©</sup></p>
+      <div class="hud__head-right">
+        <button class="hud__back" id="roomBack" type="button">← BACK TO JOURNEY</button>
+        <div class="hud__social">
+          <a class="hud__social-link" href="https://www.instagram.com/common_ordinarydays/" target="_blank" rel="noopener noreferrer" aria-label="Instagram">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6">
+              <rect x="3" y="3" width="18" height="18" rx="5.5" />
+              <circle cx="12" cy="12" r="4.3" />
+              <circle cx="17.3" cy="6.7" r="0.9" fill="currentColor" stroke="none" />
+            </svg>
+          </a>
+          <a class="hud__social-link hud__social-link--note" href="https://note.com/common0626" target="_blank" rel="noopener noreferrer" aria-label="note">n</a>
+        </div>
+      </div>
+    </div>
+    <div class="hud__caption" id="caption">
+      <p class="hud__caption-num" id="captionNum"></p>
+      <h2 class="hud__caption-title" id="captionTitle"></h2>
+    </div>
+    <div class="hud__dots" id="dots"></div>
+    <p class="hud__hint" id="hint">SCROLL / DRAG — 綿毛を追う</p>
+    <p class="hud__credits">3D SCANS: POLY HAVEN (CC0)</p>
+    <div class="hud__wave" aria-hidden="true">
+      <svg width="92" height="14" viewBox="0 0 92 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M0 7 Q 5.75 0, 11.5 7 T 23 7 T 34.5 7 T 46 7 T 57.5 7 T 69 7 T 80.5 7 T 92 7" stroke="#55534e" stroke-width="1.4" fill="none"/>
+      </svg>
+    </div>
+    <div class="hud__progressbar"><span id="progressBar"></span></div>
+  </div>
+
+  <!-- 3D追従テキストレイヤー -->
+  <div class="anchors" id="anchors"></div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+      "gsap": "https://cdn.jsdelivr.net/npm/gsap@3.13.0/+esm"
+    }
+  }
+  </script>
+  <script type="module" src="experience.js"></script>
+</body>
+</html>

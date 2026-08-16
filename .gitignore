@@ -1,0 +1,14 @@
+# TOPページ（index.html）は実写真への差し替え待ちのため今回は含めない。
+# experience.html（本編）だけを公開対象とする
+index.html
+style.css
+script.js
+webgl-bg.js
+
+# トレーラー撮影モード（?trailer=1）の作業出力。サイトの動作には不要
+trailer-frames/
+common-trailer.mp4
+
+# OS/エディタ
+.DS_Store
+Thumbs.db
