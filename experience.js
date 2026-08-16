@@ -2640,7 +2640,11 @@ ROOM_PLACEHOLDER_TEX.needsUpdate = true;
    フル解像度テクスチャがまとめてVRAMに乗ってGPUメモリを圧迫する。
    正面から見えている範囲＋前後の余白（ウィンドウ）だけを実体化し、
    外れたらdisposeして解放する */
-const ROOM_WINDOW_RADIUS = (ROW_H * 1.5 + ROOM_GAP) * 6;
+/* タッチ端末はGPU/帯域が細く、同時に実体化する枚数が多いほど
+   フレームが重くなり、横送り自体がもっさりして見える。窓を絞って
+   同時ロード数を減らす（PCと同じ6枚窓のままでは、実機での重さが
+   横スクロールの追従の遅さとして体感されていた） */
+const ROOM_WINDOW_RADIUS = (ROW_H * 1.5 + ROOM_GAP) * (IS_TOUCH ? 3.5 : 6);
 
 function ensureRoomTexture(m) {
   const d = m.userData;
@@ -3022,8 +3026,11 @@ function updateRoomCaption(hit, dt) {
 }
 
 /* 横スクロール。lerp で target へ寄せるだけの素直な作りにする
-   （Codrops のギャラリーと同じ ease 0.07。速く動き出して静かに止まる） */
-const roomScroll = { current: 0, target: 0, ease: 0.07 };
+   （Codrops のギャラリーと同じ ease 0.07。速く動き出して静かに止まる）。
+   タッチ端末は指の移動量がそのまま target に乗る一方、current の追従が
+   PC想定の減衰のままだと「指について来ない・もっさり」に感じられるため、
+   タッチだけ追従を速める */
+const roomScroll = { current: 0, target: 0, ease: IS_TOUCH ? 0.16 : 0.07 };
 let activeRoom = null;
 /* ?debug=1 のときだけ内部状態を覗けるようにする（挙動の切り分け用） */
 if (new URLSearchParams(location.search).get("debug") === "1") {
@@ -3513,7 +3520,11 @@ function updateHud(capArea, capW) {
          情報が重複するだけだったため、全エリア共通で表示しない */
       captionNum.textContent = "";
       captionTitle.textContent = active.name;
-      caption.classList.add("is-visible");
+      /* ABOUTは日英バイオだけで画面の高さいっぱいまで伸びるモバイル幅では、
+         左下固定のこの見出しが本文の末尾（英語バイオ）に重なって埋もれていた。
+         他のエリアは短いのでこの見出しだけが頼りだが、ABOUTは名前・肩書きが
+         本文内に既にあるため無くても迷わない */
+      caption.classList.toggle("is-visible", !(innerWidth <= 767 && active.isAbout));
     } else {
       caption.classList.remove("is-visible");
     }
@@ -3639,7 +3650,10 @@ function adaptQuality(dt) {
   /* 戻す条件は 60fps(16.7ms)より速いことを求めてはいけない。
      画面同期で60fpsに張り付くと永久に満たされず、一度下がった画質が戻らなくなる */
   else if (avg < 0.0178 && q < 1) q += 0.04;     /* 56fps超：ゆっくり戻す */
-  q = THREE.MathUtils.clamp(q, 0.7, 1);
+  /* PC想定の下限0.7では、非力なモバイル機で重い場面（部屋を開いた直後など）
+     に画質を十分落とし切れず、fpsが上がらないまま張り付いていた。
+     タッチ端末はもう一段下まで許容し、確実にフレームレートを取り戻す */
+  q = THREE.MathUtils.clamp(q, IS_TOUCH ? 0.55 : 0.7, 1);
   if (Math.abs(q - qualityScale) > 0.001) {
     qualityScale = q;
     lastQualityAdjust = now;
