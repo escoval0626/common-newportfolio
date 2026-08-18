@@ -913,12 +913,38 @@ let loadedCount = 0;
 const totalCount = Object.keys(MODELS).length;
 
 function loadModel(key, url) {
+  const baseUrl = url.slice(0, url.lastIndexOf("/") + 1);
   return new Promise((resolve) => {
-    loaderGLTF.load(url, (gltf) => {
-      loaded[key] = gltf.scene;
-      loadedCount++;
-      resolve();
-    }, undefined, () => { loadedCount++; resolve(); });
+    /* placeScan()（後述）はgeometryをMeshSurfaceSamplerで表面サンプリング
+       し、固定パレットで色を塗るだけで、material/textureは一切参照しない。
+       それでもGLTFLoader.load()は標準でmaterialのtexture画像（法線・拡散色・
+       ラフネス、1モデルにつき3枚）まで自動ダウンロードしてしまい、
+       5モデル合計で7.7MiB・15リクエストが完全に無駄になっていた。
+       .gltf自体はテキスト(JSON)なので、パース前にtexture参照を取り除いてから
+       GLTFLoader.parse()に渡し、画像バイナリへのリクエスト自体を発生させない */
+    fetch(url)
+      .then((r) => r.json())
+      .then((gltfJson) => {
+        if (gltfJson.materials) {
+          gltfJson.materials.forEach((m) => {
+            delete m.normalTexture;
+            delete m.occlusionTexture;
+            delete m.emissiveTexture;
+            if (m.pbrMetallicRoughness) {
+              delete m.pbrMetallicRoughness.baseColorTexture;
+              delete m.pbrMetallicRoughness.metallicRoughnessTexture;
+            }
+          });
+        }
+        gltfJson.textures = [];
+        gltfJson.images = [];
+        loaderGLTF.parse(JSON.stringify(gltfJson), baseUrl, (gltf) => {
+          loaded[key] = gltf.scene;
+          loadedCount++;
+          resolve();
+        }, () => { loadedCount++; resolve(); });
+      })
+      .catch(() => { loadedCount++; resolve(); });
   });
 }
 
@@ -1497,7 +1523,7 @@ const AREAS = [
     hotspot: "",
     lines: [],
     build() {
-      addArtwork("assets/scenes/about_art.png",
+      addArtwork("assets/scenes/about_art.webp",
         4.0, GROUND_Y + 2.7, -15, 8.6, this.viewPos, { aspect: 0.668, maxOp: 0.92, near: 8, far: 30 });
       this.object = addPickProxy(4.0, -15, 7.2, 5.0, 3.0);
     },
@@ -1533,11 +1559,11 @@ const AREAS = [
        ポピー畑(横)を奥の壁に、コスモス(縦)を左手前の層、タンポポ(縦)を主役に。 */
     build() {
       const z = -30, y = GROUND_Y;
-      addArtwork("assets/scenes/p4_art.png",            /* ポピー畑：奥の壁 */
+      addArtwork("assets/scenes/p4_art.webp",            /* ポピー畑：奥の壁 */
         -7.4, y + 3.4, z - 2.4, 9.0, this.viewPos, { aspect: 0.668, maxOp: 0.62, near: 8, far: 32 });
-      addArtwork("assets/scenes/p5_art.png",            /* コスモス：左手前の層 */
+      addArtwork("assets/scenes/p5_art.webp",            /* コスモス：左手前の層 */
         -9.4, y + 2.9, z + 1.4, 4.4, this.viewPos, { aspect: 1.5, maxOp: 0.78, near: 7, far: 28 });
-      addArtwork("assets/scenes/p1_art.png",            /* タンポポ：主役 */
+      addArtwork("assets/scenes/p1_art.webp",            /* タンポポ：主役 */
         -5.4, y + 3.0, z + 0.4, 5.0, this.viewPos, { aspect: 1.499, maxOp: 0.95, near: 6.5, far: 28 });
       this.object = addPickProxy(-6.5, -30, 6.4, 6.6, 3.2);
     },
@@ -1571,9 +1597,9 @@ const AREAS = [
     ],
     /* コラージュ確定：沼地と桟橋。地に足のついた静けさ。 */
     build() {
-      addArtwork("assets/scenes/land2_art.png",
+      addArtwork("assets/scenes/land2_art.webp",
         8.8, GROUND_Y + 3.2, -50.0, 9.2, this.viewPos, { aspect: 0.723, maxOp: 0.8 });
-      addArtwork("assets/scenes/land1_art.png",
+      addArtwork("assets/scenes/land1_art.webp",
         6.6, GROUND_Y + 2.7, -46.5, 8.2, this.viewPos, { aspect: 0.668 });
       this.object = addPickProxy(7.5, -47, 7.4, 5.4, 3.2);
     },
@@ -1612,9 +1638,9 @@ const AREAS = [
     ],
     /* コラージュ：建築の完成画2枚を層にして重ねる（一旦保留・位置のみ） */
     build() {
-      addArtwork("assets/scenes/arch2_art.png",
+      addArtwork("assets/scenes/arch2_art.webp",
         -9.2, GROUND_Y + 3.2, -66.5, 9.2, this.viewPos, { aspect: 0.665, maxOp: 0.8 });
-      addArtwork("assets/scenes/arch1_art.png",
+      addArtwork("assets/scenes/arch1_art.webp",
         -6.6, GROUND_Y + 2.7, -63.2, 8.2, this.viewPos, { aspect: 0.665 });
       this.object = addPickProxy(-7.5, -64, 7.4, 5.4, 3.2);
     },
@@ -1665,9 +1691,9 @@ const AREAS = [
        霧の電柱道(縦)を主役に、誰もいないブランコ(縦)を右奥に添える静かな構成。 */
     build() {
       const z = -80, y = GROUND_Y;
-      addArtwork("assets/scenes/s5_art.png",            /* 霧の電柱道：主役 */
+      addArtwork("assets/scenes/s5_art.webp",            /* 霧の電柱道：主役 */
         5.2, y + 3.2, z, 6.0, this.viewPos, { aspect: 1.5, maxOp: 0.95, near: 6.5, far: 28 });
-      addArtwork("assets/scenes/s4_art.png",            /* 無人のブランコ：右奥に添える */
+      addArtwork("assets/scenes/s4_art.webp",            /* 無人のブランコ：右奥に添える */
         9.0, y + 3.0, z - 2.6, 4.6, this.viewPos, { aspect: 1.5, maxOp: 0.6, near: 8, far: 30 });
       this.object = addPickProxy(5.5, -80, 7.4, 5.4, 4.2);
     },
@@ -1693,7 +1719,7 @@ const AREAS = [
     ],
     /* コラージュ：柳と電柱の情景（DSC_8627、横長1535x1025→aspect 0.668）を単体で */
     build() {
-      addArtwork("assets/scenes/abst4_art.png",
+      addArtwork("assets/scenes/abst4_art.webp",
         -7.0, GROUND_Y + 2.7, -96, 8.4, this.viewPos, { aspect: 0.668, maxOp: 0.92, near: 7, far: 30 });
       this.object = addPickProxy(-7.0, -96, 7.4, 5.4, 3.2);
       /* 絵の周りに水彩の色斑をアクセントとして添える（絵より手前＝カメラ側に置き、隠れないようにする） */
@@ -1719,7 +1745,7 @@ const AREAS = [
        粒子の"組み上がり"演出（dust）は近づいても常時うっすら残る仕様のため、
        繊細な鉛筆線の一枚絵ではノイズになって元素材の質感を損なう→無効化して素材そのままを見せる */
     build() {
-      addArtwork("assets/scenes/ex1_art.png",
+      addArtwork("assets/scenes/ex1_art.webp",
         7.5, GROUND_Y + 3.4, -112, 7.0, this.viewPos, { aspect: 1.499, maxOp: 1.0, near: 6.5, far: 28, dust: false });
       this.object = addPickProxy(7.5, -112, 7.4, 5.4, 3.2);
       /* 絵の周りに水彩の色斑をアクセントとして添える（絵より手前＝カメラ側、かつ画角がタイトなので絵に近づけて配置） */

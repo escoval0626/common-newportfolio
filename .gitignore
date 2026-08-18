@@ -10,6 +10,11 @@ trailer-frames/
 common-trailer.mp4
 common-trailer-vertical.mp4
 
+# scenes配下はWebP化してコードの参照も切り替え済み。元PNGはローカルの
+# バックアップとしてのみ残し、リポジトリ・本番配信には含めない
+# （BLOCKER-05: PNG合計34MB→WebP合計12MB、約65%削減）
+assets/scenes/*.png
+
 # OS/エディタ
 .DS_Store
 Thumbs.db
