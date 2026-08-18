@@ -1834,6 +1834,54 @@ const ABOUT_BIO = {
   ],
 };
 
+/* ===== 静的作品一覧（DOM層）：3D体験は視覚演出であり、作品そのものの
+   唯一の窓口ではない。WebGLのCanvas上に描かれたテクスチャはスクリーン
+   リーダーにも検索エンジンのクローラーにも「ただの絵」にしか見えないため、
+   同じ写真・キャプションを通常のHTML（img alt + figcaption）として
+   もう1系統、独立に用意する。画面には出さない（.sr-only）が、
+   3D側のensureRoomTexture（正面付近だけ実体化するウィンドウ方式）を
+   バイパスして全98枚を一括ダウンロードしないよう loading="lazy" にする。
+   ページ表示直後にこのCanvas外の要素まで先読みされることはない */
+function buildStaticGallery() {
+  const root = document.getElementById("staticGallery");
+  if (!root) return;
+  AREAS.forEach((area) => {
+    if (area.isAbout || area.name === "CONTACT" || !area.photos || !area.photos.length) return;
+    const section = document.createElement("section");
+    section.setAttribute("aria-labelledby", `sg-h-${area.name}`);
+    const h2 = document.createElement("h2");
+    h2.id = `sg-h-${area.name}`;
+    h2.textContent = area.name;
+    section.appendChild(h2);
+    if (area.lines && area.lines.length) {
+      const p = document.createElement("p");
+      p.lang = "ja";
+      p.textContent = area.lines.join("");
+      section.appendChild(p);
+    }
+    const ul = document.createElement("ul");
+    area.photos.forEach(([url, cap], i) => {
+      const li = document.createElement("li");
+      const fig = document.createElement("figure");
+      const img = document.createElement("img");
+      img.src = url;
+      img.alt = cap || `${area.name} ${i + 1}`;
+      img.loading = "lazy";
+      fig.appendChild(img);
+      if (cap) {
+        const figcap = document.createElement("figcaption");
+        figcap.textContent = cap;
+        fig.appendChild(figcap);
+      }
+      li.appendChild(fig);
+      ul.appendChild(li);
+    });
+    section.appendChild(ul);
+    root.appendChild(section);
+  });
+}
+buildStaticGallery();
+
 /* 綿毛ガイド */
 let fluff = null;
 
@@ -1844,10 +1892,28 @@ Promise.all(
   buildWorldBase();
   buildTransitObjects();
   buildHero();
-  AREAS.forEach((ar) => { ar.build(); ar.currentW = 0; });
-  fluff = makeFluff();
-  fluff.position.copy(HERO_HEAD);
-  sceneReady = true; /* パネル画像の非同期ロードはこの後 panelPending で待つ */
+  AREAS.forEach((ar) => { ar.currentW = 0; });
+  /* 各エリアのbuild()は、コラージュ絵（scenes/*.png、シリーズ合計30MB超）の
+     ダウンロードを開始する副作用を持つ。7エリア分を同時に開始すると、
+     ENTER直後に必要な最初のエリア分の帯域を、まだ訪れてもいない後方の
+     エリアの画像が食い合っていた。旅の順番（t昇順）に沿って少しずつ
+     間隔を空けて組み立て、最初の2エリア分が組み上がった時点でENTERを
+     解禁する（残りは背景で追いつく。詩コピー等のDOM要素やホットスポットは
+     別途モジュール読み込み時に用意済みなので、旅の進行自体は妨げない） */
+  const buildOrder = [...AREAS].sort((a, b) => a.t - b.t);
+  let builtCount = 0;
+  function buildNextArea() {
+    if (builtCount >= buildOrder.length) return;
+    buildOrder[builtCount].build();
+    builtCount++;
+    if (builtCount === 2) {
+      fluff = makeFluff();
+      fluff.position.copy(HERO_HEAD);
+      sceneReady = true; /* パネル画像の非同期ロードはこの後 panelPending で待つ */
+    }
+    if (builtCount < buildOrder.length) setTimeout(buildNextArea, 180);
+  }
+  buildNextArea();
 });
 
 /* 一人称視点で移動する3D空間＋常時揺れるカメラは、前庭障害・片頭痛・
@@ -2033,11 +2099,15 @@ function updateCamera(dt) {
     const near = Math.max(0, 1 - Math.abs(rig.progress - v.t) / 0.05);
     v.el.style.opacity = (Math.pow(near, 1.25) * ((rig.veil || 0) / 0.85)).toFixed(3);
   }
-  /* 写真の先読み：情景に近づいた時点で完了させる。
-     遷移が始まってから読み込むと、立ち上がりが間に合わず演出が台無しになる */
+  /* 写真の先読み：情景に近づいた時点で、部屋を開いた瞬間に正面へ来る
+     先頭数枚だけ完了させる。以前はシリーズ全部（多いもので30枚超）を
+     ここで一括ダウンロードしており、buildPlaceRoom側にせっかく用意した
+     「正面付近だけ実体化する」ウィンドウ方式のHTTP転送量削減効果を
+     相殺していた。残りはensureRoomTexture（ウィンドウ判定）に任せる */
   if (capArea && capW > 0.25 && capArea.photos && !capArea._pre) {
     capArea._pre = true;
-    capArea.photos.forEach(([u]) => { const im = new Image(); im.src = u; });
+    const PRELOAD_COUNT = 3;
+    capArea.photos.slice(0, PRELOAD_COUNT).forEach(([u]) => { const im = new Image(); im.src = u; });
     /* 案E：粒の組み替え先も、この時点で用意しておく（遷移開始後だと間に合わない） */
   }
   /* 部屋（カルーセル）の躯体（メッシュ・マテリアル群）も同じタイミングで
@@ -2514,6 +2584,14 @@ roomBack.addEventListener("click", (e) => {
   if (galleryOpen) closeGallery();
 });
 
+const zoomCloseBtnEl = document.getElementById("zoomClose");
+if (zoomCloseBtnEl) {
+  zoomCloseBtnEl.addEventListener("click", (e) => {
+    e.stopPropagation();
+    closeZoom();
+  });
+}
+
 /* ============================================================
    情景 → 写真ページの遷移
    「絵が写真に変わる」のではなく「時間を巻き戻して、絵がまだ写真だった頃に還る」。
@@ -2843,6 +2921,8 @@ function zoomCapText(mesh, n, total) {
   zoomCap.querySelector(".zoom-cap__num span").textContent = label;
   zoomCap.querySelector(".zoom-cap__title span").textContent = String(d.cap || "");
   zoomCap.querySelector(".zoom-cap__meta span").textContent = d.area.name;
+  const live = document.getElementById("zoomLive");
+  if (live) live.textContent = `${d.area.name}、${n + 1} / ${total}、${d.cap || ""}`;
 }
 
 /* 動いている最中の1枚は、毎フレームの姿勢計算から外す。
@@ -2994,6 +3074,18 @@ function openZoom(mesh) {
   const creditsEl = document.querySelector(".hud__credits");
   if (waveEl) waveEl.classList.add("is-zoom-hidden");
   if (creditsEl) creditsEl.classList.add("is-zoom-hidden");
+  /* モーダルとして扱う：背景（HUD・3Dアンカー群）をinertにしてTabが
+     抜けないようにし、閉じるボタンへフォーカスを移す */
+  zoomCap.setAttribute("aria-modal", "true");
+  zoomCap.setAttribute("aria-hidden", "false");
+  if (hud) hud.inert = true;
+  if (anchorsWrap) anchorsWrap.inert = true;
+  const zoomCloseBtn = document.getElementById("zoomClose");
+  if (zoomCloseBtn) {
+    zoomCloseBtn.classList.add("is-visible");
+    zoomCloseBtn.tabIndex = 0;
+    zoomCloseBtn.focus();
+  }
 
   if (zoomTl) zoomTl.kill();
   zoomTl = gsap.timeline({ defaults: { ease: "expo.out" } });
@@ -3049,6 +3141,16 @@ function closeZoom() {
   const creditsEl = document.querySelector(".hud__credits");
   if (waveEl) waveEl.classList.remove("is-zoom-hidden");
   if (creditsEl) creditsEl.classList.remove("is-zoom-hidden");
+  zoomCap.setAttribute("aria-modal", "false");
+  zoomCap.setAttribute("aria-hidden", "true");
+  if (hud) hud.inert = false;
+  if (anchorsWrap) anchorsWrap.inert = false;
+  const zoomCloseBtn = document.getElementById("zoomClose");
+  if (zoomCloseBtn) {
+    zoomCloseBtn.classList.remove("is-visible");
+    zoomCloseBtn.tabIndex = -1;
+  }
+  if (roomBack) roomBack.focus(); /* 部屋の中へ戻る。フォーカスの置き所として自然な導線 */
   lockMesh(r, mesh); /* 戻り切るまでは毎フレーム処理に触らせない */
   if (zoomTl) zoomTl.kill();
   zoomTl = gsap.timeline({
