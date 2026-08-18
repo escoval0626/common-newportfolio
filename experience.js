@@ -2133,7 +2133,9 @@ function updateCamera(dt) {
   if (capArea && capW > 0.25 && capArea.photos && !capArea._pre) {
     capArea._pre = true;
     const PRELOAD_COUNT = 3;
-    capArea.photos.slice(0, PRELOAD_COUNT).forEach(([u]) => { const im = new Image(); im.src = u; });
+    /* 部屋を開いた瞬間に見えるのは壁掛けの一覧表示（960pxで十分な解像度）。
+       フル解像度が要るのは実際にzoomした時だけなので、ここでもサムネイルを使う */
+    capArea.photos.slice(0, PRELOAD_COUNT).forEach(([u]) => { const im = new Image(); im.src = thumbUrl(u); });
     /* 案E：粒の組み替え先も、この時点で用意しておく（遷移開始後だと間に合わない） */
   }
   /* 部屋（カルーセル）の躯体（メッシュ・マテリアル群）も同じタイミングで
@@ -2785,11 +2787,19 @@ ROOM_PLACEHOLDER_TEX.needsUpdate = true;
    横スクロールの追従の遅さとして体感されていた） */
 const ROOM_WINDOW_RADIUS = (ROW_H * 1.5 + ROOM_GAP) * (IS_TOUCH ? 3.5 : 6);
 
+/* 壁掛け表示は3D空間内の小さな板で、画面上の占有率も低い。
+   フル解像度（最大2048px、平均400KB超）は明らかに過剰品質なので、
+   一覧では960px版のサムネイル（平均66KB程度）を使い、拡大して
+   見る時だけ（openZoomで）フル解像度へ差し替える */
+function thumbUrl(url) {
+  const i = url.lastIndexOf("/");
+  return url.slice(0, i + 1) + "thumb/" + url.slice(i + 1);
+}
 function ensureRoomTexture(m) {
   const d = m.userData;
   if (d.loaded || d.loading) return;
   d.loading = true;
-  const tex = new THREE.TextureLoader().load(d.url, () => {
+  const tex = new THREE.TextureLoader().load(thumbUrl(d.url), () => {
     d.loading = false;
     d.loaded = true;
     d.tex = tex;
@@ -2799,6 +2809,23 @@ function ensureRoomTexture(m) {
   });
   tex.colorSpace = THREE.SRGBColorSpace;
 }
+/* 大きく見る時だけは960pxサムネイルでは粗さが見えるため、フル解像度へ
+   差し替える。d.tex（=現在表示中のテクスチャ）自体を置き換えることで、
+   releaseRoomTexture が呼ばれた時にサムネイル/フルのどちらでも正しく
+   dispose される（差し替え忘れて2枚分GPUメモリに残ることがない） */
+function ensureFullTexture(mesh) {
+  const d = mesh.userData;
+  if (d.isFull || d.fullLoading) return;
+  d.fullLoading = true;
+  new THREE.TextureLoader().load(d.url, (fullTex) => {
+    d.fullLoading = false;
+    d.isFull = true;
+    fullTex.colorSpace = THREE.SRGBColorSpace;
+    if (d.tex) d.tex.dispose();
+    d.tex = fullTex;
+    if (activeRoom && activeRoom.zoomed === mesh) mesh.material.uniforms.uTex.value = fullTex;
+  });
+}
 function releaseRoomTexture(r, m) {
   const d = m.userData;
   if (!d.loaded) return;
@@ -2806,6 +2833,8 @@ function releaseRoomTexture(r, m) {
   d.tex.dispose();
   d.tex = null;
   d.loaded = false;
+  d.isFull = false; /* 解放時はフル解像度への差し替え状態も忘れる。再びウィンドウに
+                        入った時はサムネイルから、次に見られたらまたフルへ差し替える */
   m.material.uniforms.uTex.value = ROOM_PLACEHOLDER_TEX;
 }
 
@@ -3064,6 +3093,7 @@ function openZoom(mesh) {
   r.zoomed = mesh;
   const d = mesh.userData;
   ensureRoomTexture(mesh); /* ウィンドウ外から選ばれた場合に備え、確実にロードを始める */
+  ensureFullTexture(mesh);
 
   /* 紙の下地。世界の中に敷くので、写真だけが手前に浮いて見える */
   if (!r.backdrop) {
@@ -3135,6 +3165,7 @@ function stepZoom(dir) {
   prev.renderOrder = 0;
   next.renderOrder = 2;
   r.zoomed = next;
+  ensureFullTexture(next); /* 送り先も同じく大きく見るので、フル解像度へ差し替える */
   lockMesh(r, prev); /* 退く1枚も、戻り切るまでは触らせない */
   /* 閉じた時にこの写真が正面に来るよう、裏で列も合わせておく */
   roomScroll.target = r.positions[n] ?? roomScroll.target;
