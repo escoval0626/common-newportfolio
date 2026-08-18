@@ -32,6 +32,7 @@ function isWebGLAvailable() {
   }
 }
 function showWebglFallback() {
+  trackEvent("static_fallback_shown");
   const fb = document.getElementById("webglFallback");
   if (fb) {
     fb.classList.add("is-active");
@@ -942,9 +943,9 @@ function loadModel(key, url) {
           loaded[key] = gltf.scene;
           loadedCount++;
           resolve();
-        }, () => { loadedCount++; resolve(); });
+        }, () => { trackEvent("asset_load_error", { type: "model_parse", key }); loadedCount++; resolve(); });
       })
-      .catch(() => { loadedCount++; resolve(); });
+      .catch(() => { trackEvent("asset_load_error", { type: "model_fetch", key }); loadedCount++; resolve(); });
   });
 }
 
@@ -1428,14 +1429,27 @@ function makeCanvas(size = 128) {
    画角差を打ち消し、狙った"寄り"の見え方を保つ */
 const MOBILE_LAYOUT = innerWidth <= 767;
 /* 操作ヒントの文言分岐用。画面幅ではなく実際の入力方式で判定する
-   （タッチ対応の広い画面もあるため） */
-const IS_TOUCH = matchMedia("(pointer: coarse)").matches;
+   （タッチ対応の広い画面もあるため）。pointer:coarseだけだと、
+   タッチ対応ノートPC等のhybrid端末（主入力はマウスでもタッチも使える）を
+   取りこぼすことがあるため、maxTouchPointsも合わせて見る */
+const IS_TOUCH = matchMedia("(pointer: coarse)").matches || (navigator.maxTouchPoints || 0) > 0;
 /* ?debug=1 / ?trailer=1 は開発中の内部確認用。本番ドメインでも
    誰でもURLに付けるだけで発火してしまうと、window.__xp経由で
    内部stateが覗けたり、trailerモードが900フレームぶんの
    レンダリング＋POSTを閲覧者のブラウザに走らせてしまう。
    ローカル開発時（localhost / 127.0.0.1）だけ許可する */
 const DEV_TOOLS_ALLOWED = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+
+/* 計測の受け口。今はまだ計測サービスを何も導入していない（無料/課金なしの
+   縛りがあるため軽率に外部サービスへ登録できない）ので、この関数の中身だけ
+   差し替えれば呼び出し側は変更不要になるよう、イベント名＋最小限のデータ
+   という素直な形に統一しておく。window.dataLayer（GA4/GTM互換）が存在すれば
+   そこにも積む。PII（メールアドレス本文や氏名等）は載せない */
+function trackEvent(name, data) {
+  if (window.dataLayer) window.dataLayer.push({ event: name, ...data });
+  if (DEV_TOOLS_ALLOWED) console.debug("[track]", name, data || "");
+}
+
 const curve = new THREE.CatmullRomCurve3(
   [
     new THREE.Vector3(0, 1.6, MOBILE_LAYOUT ? 5.6 : 8), // 起点（冒頭のうしろ）
@@ -1947,7 +1961,12 @@ Promise.all(
    手持ちカメラの呼吸とマウス首振りだけをここで抑える（CSS側は別途） */
 const mqReduce = window.matchMedia("(prefers-reduced-motion: reduce)");
 let REDUCE_MOTION = mqReduce.matches;
-mqReduce.addEventListener("change", (e) => { REDUCE_MOTION = e.matches; });
+const onReduceMotionChange = (e) => { REDUCE_MOTION = e.matches; };
+/* addEventListener("change", ...) はSafari 13以前・一部の古い組込みWebViewに
+   無く、そこでは設定変更時にREDUCE_MOTIONが更新されないまま固まっていた。
+   非推奨だがaddListener/removeListenerだけを持つ環境向けにfallbackする */
+if (mqReduce.addEventListener) mqReduce.addEventListener("change", onReduceMotionChange);
+else if (mqReduce.addListener) mqReduce.addListener(onReduceMotionChange);
 
 /* ============================================================
    カメラリグ
@@ -2458,8 +2477,12 @@ AREAS.forEach((area) => {
   });
   el.addEventListener("click", (e) => {
     e.stopPropagation();
-    if (area.link) window.location.href = area.link;
-    else openGallery(area);
+    if (area.link) {
+      trackEvent("click_commission_cta", { area: area.name });
+      window.location.href = area.link;
+    } else {
+      openGallery(area);
+    }
   });
 });
 
@@ -2806,6 +2829,9 @@ function ensureRoomTexture(m) {
     m.material.uniforms.uTex.value = tex;
     gsap.to(m.material.uniforms.uOpacity, { value: 1, duration: 0.5, ease: "power2.out" });
     if (d.area._room) d.area._room.relayout();
+  }, undefined, () => {
+    d.loading = false;
+    trackEvent("asset_load_error", { type: "photo_thumb", area: d.area ? d.area.name : null, url: thumbUrl(d.url) });
   });
   tex.colorSpace = THREE.SRGBColorSpace;
 }
@@ -3092,6 +3118,7 @@ function openZoom(mesh) {
   if (!r || r.zoomed) return;
   r.zoomed = mesh;
   const d = mesh.userData;
+  trackEvent("zoom_open", { area: d.area ? d.area.name : null, idx: r.meshes.indexOf(mesh) });
   ensureRoomTexture(mesh); /* ウィンドウ外から選ばれた場合に備え、確実にロードを始める */
   ensureFullTexture(mesh);
 
@@ -3400,6 +3427,7 @@ function openGallery(area) {
   if (galleryOpen || transitionActive || !area.photos) return;
   galleryOpen = true;
   focusBeforeGallery = document.activeElement;
+  trackEvent("gallery_open", { area: area.name, count: area.photos.length });
 
   /* 勢いよくスクロールした直後にホットスポットを踏むと、rig.target が
      まだこのエリアの t を行き過ぎた（あるいは手前で止まっている）ことがある。
@@ -3611,8 +3639,12 @@ window.addEventListener("click", (e) => {
     const area = AREAS.find((a) => a.object === hits[0].object);
     if (!area) return;
     if (area.currentW > 0.5) {
-      if (area.link) window.location.href = area.link;
-      else openGallery(area);
+      if (area.link) {
+        trackEvent("click_commission_cta", { area: area.name });
+        window.location.href = area.link;
+      } else {
+        openGallery(area);
+      }
     } else {
       rig.started = true;
       rig.target = area.t;
@@ -3808,15 +3840,47 @@ function updateHud(capArea, capW) {
 /* URLで直接その情景を共有できるようにする。着地した（capWが高い）情景の
    名前をハッシュに反映し、次に開いた時はそのハッシュを見て自動的に旅する */
 let shownHashArea = null;
+/* popstate（ブラウザの戻る/進む）による変更中は、その結果としてここが
+   再度呼ばれてもpushStateしない。抑制しないと、戻った先でまたpushされ、
+   履歴が伸び続けて「戻る」を押すたび同じ場所を行き来するだけになる */
+let suppressPushState = false;
 function updateUrlHash(capArea, capW) {
   const target = capArea && capW > 0.6 ? capArea : null;
   if (target === shownHashArea) return;
   shownHashArea = target;
   const hash = target ? "#" + target.name.toLowerCase() : "";
   if (location.hash !== hash) {
-    history.replaceState(null, "", location.pathname + location.search + hash);
+    const url = location.pathname + location.search + hash;
+    /* 情景へ「着地」した瞬間だけ意味のある履歴として積む。通過中・
+       離脱時（targetがnull）まで毎回積むと、素早く巡っただけで
+       大量の履歴エントリができ、戻るボタンが実用にならなくなる */
+    if (target && !suppressPushState) {
+      history.pushState({ area: target.name }, "", url);
+    } else {
+      history.replaceState({ area: target ? target.name : null }, "", url);
+    }
   }
 }
+
+/* ブラウザの戻る/進むで、対応する情景へ実際にジャンプする */
+window.addEventListener("popstate", () => {
+  if (!rig.entered) return; /* まだENTER前なら何もしない */
+  const hashName = location.hash.slice(1).toLowerCase();
+  const target = hashName && AREAS.find((a) => a.name.toLowerCase() === hashName);
+  suppressPushState = true;
+  if (galleryOpen) closeGallery();
+  if (target) {
+    rig.started = true;
+    rig.target = target.t;
+    rig.veil = 0.85; /* URL直接アクセス時と同じ、霧をかぶせた自然な着地にする */
+    if (fogVeil) fogVeil.style.opacity = "0.85";
+  } else {
+    rig.target = 0; /* 対応する情景が無いハッシュ（＝旅の起点）まで戻す */
+  }
+  rig.lastInput = performance.now();
+  shownHashArea = target || null; /* updateUrlHashの重複判定と状態を合わせる */
+  setTimeout(() => { suppressPushState = false; }, 100);
+});
 
 /* ---------- resize / loop ---------- */
 /* fovは横長(16:9)を基準に決めた画角。縦持ちのまま aspect だけ変えると
@@ -3854,6 +3918,13 @@ function resize() {
   }
 }
 window.addEventListener("resize", resize);
+/* iOS Safari等では画面回転時、resizeイベントの発火が遅れたり、
+   回転アニメーションの途中サイズで一度発火してから確定サイズで
+   もう一度発火する等、タイミングが不安定なことがある。
+   orientationchangeも合わせて拾い、実際のサイズが確定するのを
+   少し待ってから再計算する（早すぎるとinnerWidth/Heightが
+   まだ回転前の値のまま） */
+window.addEventListener("orientationchange", () => { setTimeout(resize, 200); });
 resize();
 
 /* 入場前：タンポポのマクロ（綿球が画面いっぱい） */

@@ -77,6 +77,16 @@ http
           res.writeHead(200, {
             "Content-Type": MIME[path.extname(t).toLowerCase()] || "application/octet-stream",
             "Cache-Control": "no-cache",
+            /* 本番(vercel.json)と同じCSP等をここでも返し、ローカルで
+               動作確認できるようにする（本番デプロイには使われない） */
+            "X-Content-Type-Options": "nosniff",
+            "Referrer-Policy": "strict-origin-when-cross-origin",
+            "Content-Security-Policy":
+              "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'sha256-MyzGJLvLJiAK6ZRWs4iLCdum7R3YuhvvouXCROeMvDU='; " +
+              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+              "font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; " +
+              "media-src 'self'; connect-src 'self' https://cdn.jsdelivr.net; " +
+              "object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
           });
           res.end(data);
         });
