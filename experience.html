@@ -6,32 +6,51 @@
   <title>Common — Sho Kitago</title>
   <meta name="description" content="Common — 写真家 北郷 将 のポートフォリオ" />
   <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
+  <link rel="canonical" href="https://www.commonphotograph.com/" />
 
-  <!-- OGP / Twitter Card。og:url・og:imageの絶対パスはデプロイ先ドメイン確定後に差し替え -->
+  <!-- OGP / Twitter Card -->
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Common — Sho Kitago" />
+  <meta property="og:url" content="https://www.commonphotograph.com/" />
   <meta property="og:title" content="Common — Sho Kitago" />
   <meta property="og:description" content="Common — 写真家 北郷 将 のポートフォリオ" />
-  <meta property="og:image" content="assets/photos/xp/landscape.jpg" />
+  <meta property="og:image" content="https://www.commonphotograph.com/assets/photos/xp/landscape.jpg" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="Common — 写真家 北郷 将 のポートフォリオ" />
   <meta property="og:locale" content="ja_JP" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Common — Sho Kitago" />
   <meta name="twitter:description" content="Common — 写真家 北郷 将 のポートフォリオ" />
-  <meta name="twitter:image" content="assets/photos/xp/landscape.jpg" />
+  <meta name="twitter:image" content="https://www.commonphotograph.com/assets/photos/xp/landscape.jpg" />
+  <meta name="twitter:image:alt" content="Common — 写真家 北郷 将 のポートフォリオ" />
 
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
-    "@type": "Person",
-    "name": "Sho Kitago",
-    "alternateName": "北郷 将",
-    "jobTitle": "Photographer",
-    "url": "",
-    "email": "mailto:escoval0626@gmail.com",
-    "address": { "@type": "PostalAddress", "addressLocality": "Nagareyama", "addressRegion": "Chiba", "addressCountry": "JP" },
-    "sameAs": [
-      "https://www.instagram.com/common_ordinarydays/",
-      "https://note.com/common0626"
+    "@graph": [
+      {
+        "@type": "Person",
+        "@id": "https://www.commonphotograph.com/#person",
+        "name": "Sho Kitago",
+        "alternateName": "北郷 将",
+        "jobTitle": "Photographer",
+        "url": "https://www.commonphotograph.com/",
+        "email": "mailto:escoval0626@gmail.com",
+        "address": { "@type": "PostalAddress", "addressLocality": "Nagareyama", "addressRegion": "Chiba", "addressCountry": "JP" },
+        "sameAs": [
+          "https://www.instagram.com/common_ordinarydays/",
+          "https://note.com/common0626"
+        ]
+      },
+      {
+        "@type": "WebSite",
+        "@id": "https://www.commonphotograph.com/#website",
+        "url": "https://www.commonphotograph.com/",
+        "name": "Common — Sho Kitago",
+        "inLanguage": "ja",
+        "author": { "@id": "https://www.commonphotograph.com/#person" }
+      }
     ]
   }
   </script>
@@ -175,7 +194,8 @@
       opacity: 0; transition: opacity 0.1s linear;
     }
     .hero-title__mark {
-      font-family: var(--font-display); font-weight: 300;
+      margin: 0; font-weight: 300;
+      font-family: var(--font-display);
       font-size: clamp(52px, 8vw, 112px); line-height: 0.92;
       letter-spacing: 0.06em; color: #171410;
       text-shadow: 0 0 10px #f4f1ea, 0 2px 3px rgba(244,241,234,0.9);
@@ -184,7 +204,7 @@
       font-style: italic; font-weight: 300;
     }
     .hero-title__sub {
-      margin-top: 18px; padding-left: 0.3em;
+      margin: 18px 0 0; padding-left: 0.3em;
       display: flex; align-items: center; gap: 14px;
       font-family: var(--font-latin); font-weight: 300;
       font-size: 12px; letter-spacing: 0.42em; text-transform: uppercase;
@@ -708,10 +728,13 @@
 
   <canvas class="xp-canvas" id="xpCanvas"></canvas>
   <!-- WebGL非対応・コンテキスト喪失時のフォールバック -->
-  <div class="webgl-fallback" id="webglFallback" aria-hidden="true">
+  <!-- index.html（静的TOP）は実写真差し替え待ちで本番未公開のため、
+       ここへの導線は必ず機能するmailtoにする。role/aria-hiddenはJS側
+       (showWebglFallback)で表示状態と同期させる -->
+  <div class="webgl-fallback" id="webglFallback" role="alert" aria-hidden="true">
     <p class="webgl-fallback__brand">COMMON — EXPERIENCE</p>
     <p class="webgl-fallback__msg">この体験の表示に問題が発生しました。<br />ページの再読み込み、またはブラウザの更新をお試しください。</p>
-    <a class="webgl-fallback__link" href="index.html">← ポートフォリオTOPへ戻る</a>
+    <a class="webgl-fallback__link" id="webglFallbackLink" href="mailto:escoval0626@gmail.com">お問い合わせ — escoval0626@gmail.com</a>
   </div>
   <!-- ミニマルなループ動画（霧の揺らぎを乗算で薄く重ねる・試験導入）。
        CSSでdisplay:none中（下のCSS参照）。autoplayがあるとdisplay:noneでも
@@ -738,8 +761,8 @@
   <div class="room-cap" id="roomCap" aria-hidden="true"><i></i><span></span></div>
   <!-- ヒーロータイトル：ポートフォリオTOPのタイトル（冒頭で表示・スクロールで退場） -->
   <div class="hero-title" id="heroTitle">
-    <div class="hero-title__mark"><em>Common</em></div>
-    <div class="hero-title__sub">Portfolio — Sho Kitago</div>
+    <h1 class="hero-title__mark"><em>Common</em></h1>
+    <p class="hero-title__sub">Portfolio — Sho Kitago</p>
   </div>
 
   <!-- LOADER -->
@@ -748,7 +771,7 @@
     <p class="loader__status" id="loaderStatus">LOADING 0%</p>
     <div class="loader__bar"><span id="loaderBar"></span></div>
     <p class="loader__desc"><span>一輪のタンポポから、</span><span>綿毛がひとつ旅に出ます。</span><br /><span>その行方を追って、</span><span>六つの風景を巡ってください。</span></p>
-    <button class="loader__enter" id="enterBtn">ENTER</button>
+    <button class="loader__enter" id="enterBtn" disabled>ENTER</button>
   </div>
 
   <!-- HUD -->
@@ -756,7 +779,7 @@
     <div class="hud__head">
       <button class="hud__logo" id="hudLogo" type="button" aria-label="旅の最初に戻る">COMMON<sup>©</sup></button>
       <div class="hud__head-right">
-        <button class="hud__back" id="roomBack" type="button">← BACK TO JOURNEY</button>
+        <button class="hud__back" id="roomBack" type="button" tabindex="-1">← BACK TO JOURNEY</button>
         <button class="hud__contact" id="hudContact" type="button">CONTACT</button>
         <div class="hud__social">
           <a class="hud__social-link" href="https://www.instagram.com/common_ordinarydays/" target="_blank" rel="noopener noreferrer" aria-label="Instagram">

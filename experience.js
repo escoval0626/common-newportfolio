@@ -33,7 +33,14 @@ function isWebGLAvailable() {
 }
 function showWebglFallback() {
   const fb = document.getElementById("webglFallback");
-  if (fb) fb.classList.add("is-active");
+  if (fb) {
+    fb.classList.add("is-active");
+    /* aria-hidden="true" のままだと支援技術からはこのメッセージ自体が
+       「存在しない」ものとして扱われ、何が起きたのか伝わらない */
+    fb.setAttribute("aria-hidden", "false");
+    const link = document.getElementById("webglFallbackLink");
+    if (link) link.focus();
+  }
   const loader = document.getElementById("loader");
   if (loader) loader.style.display = "none";
 }
@@ -1970,8 +1977,10 @@ function updateCamera(dt) {
   for (const a of AREAS) nearW = Math.max(nearW, Math.max(0, 1 - Math.abs(rig.progress - a.t) / 0.1));
   const between = 1 - nearW;
 
-  /* ① スクロール直結：中間は速く追従（＝手の動きにリンク）、情景近傍だけ減速して着地の"間"を残す */
-  const glide = 1.9 - 1.35 * nearW; /* 情景 0.55（そっと着地）／中間 1.9（スクロールに直結） */
+  /* ① スクロール直結：中間は速く追従（＝手の動きにリンク）、情景近傍だけ減速して着地の"間"を残す。
+     reduced motionでは「なめらかに移動する」こと自体が負荷になるため、
+     ほぼ1フレームで目標へ着く速さにして、実質的な即時ジャンプにする */
+  const glide = REDUCE_MOTION ? 60 : (1.9 - 1.35 * nearW); /* 情景 0.55（そっと着地）／中間 1.9（スクロールに直結） */
   rig.progress += (rig.target - rig.progress) * Math.min(1, dt * glide);
   const p = THREE.MathUtils.clamp(rig.progress, 0, 1);
   curve.getPointAt(p, _pos);
@@ -2058,7 +2067,7 @@ function updateCamera(dt) {
   _pos.y += (Math.sin(now * 0.22) * 0.12 + Math.sin(now * 0.13) * 0.06) * moveAmp;
   _pos.x += Math.sin(now * 0.17) * 0.14 * moveAmp;
 
-  camera.position.lerp(_pos, Math.min(1, dt * 2.4));
+  camera.position.lerp(_pos, Math.min(1, dt * (REDUCE_MOTION ? 60 : 2.4)));
   _mat.lookAt(camera.position, _look, UP);
   _quat.setFromRotationMatrix(_mat);
 
@@ -2207,6 +2216,26 @@ function addCopyBox(area) {
     const leadEn = document.createElement("p");
     leadEn.className = "xp-contact-extra__lead-en";
     leadEn.textContent = "For a photograph — or for something built.";
+    extra.appendChild(leadEn);
+    el.appendChild(extra);
+  }
+  /* EXHIBITIONS：「見せる」というテーマの情景に、実際の展示歴を添える。
+     ABOUTにも同じ情報を置いているが、そちらまで辿り着かない訪問者にも
+     ここで実績が見えるようにする（CONTACTと同じ追加情報ブロックを流用） */
+  if (area.name === "EXHIBITIONS") {
+    const extra = document.createElement("div");
+    extra.className = "xp-contact-extra";
+    const headline = document.createElement("p");
+    headline.className = "xp-contact-extra__headline";
+    headline.textContent = "Exhibitions.";
+    extra.appendChild(headline);
+    const lead = document.createElement("p");
+    lead.className = "xp-contact-extra__lead";
+    lead.innerHTML = "BOKEHPHOTOFAN GROUP EXHIBITION 2024 出展。<br class=\"xp-contact-extra__br\">epSITE ONLINE PHOTO CONTEST 2023 入賞。";
+    extra.appendChild(lead);
+    const leadEn = document.createElement("p");
+    leadEn.className = "xp-contact-extra__lead-en";
+    leadEn.textContent = "Exhibited in BOKEHPHOTOFAN GROUP EXHIBITION 2024. Selected in epSITE ONLINE PHOTO CONTEST 2023.";
     extra.appendChild(leadEn);
     el.appendChild(extra);
   }
@@ -2752,9 +2781,19 @@ function buildPlaceRoom(area) {
       /* 幅は写真が読めるまで判らないので、並べ直すたびに見る位置も取り直す。
          これをしないと、狙った1枚が正面から外れたままになる（＝どこにも触れない）。
          current は動かさず target だけ更新する＝読み込みが進むたびに列がガクッと
-         飛ぶのではなく、常になめらかに寄り続けるだけになる */
+         飛ぶのではなく、常になめらかに寄り続けるだけになる。
+         ただし部屋を開いた直後・まだ1枚も実写真が読めていない最初の確定だけは例外。
+         暫定aspect(1.5)で組んだ仮レイアウトから実レイアウトへ target が大きく
+         動くため、current が「なめらかに」追いつく間、選んだ1枚が半分近く
+         画面外へ出たまま数百ms〜1秒ほど留まって見えていた。初回の確定でだけ
+         current も一緒に飛ばし、以後の微調整はこれまで通りなめらかに追わせる */
       if (area._room.snapPending) {
-        roomScroll.target = positions[area._room.startIdx] || 0;
+        const snapTarget = positions[area._room.startIdx] || 0;
+        roomScroll.target = snapTarget;
+        if (!area._room.hasSnappedOnce) {
+          roomScroll.current = snapTarget;
+          area._room.hasSnappedOnce = true;
+        }
       }
     }
   }
@@ -2963,6 +3002,7 @@ function openZoom(mesh) {
   zoomTl
     .to(zoomCap, { opacity: 1, duration: 0.5 }, 0.42)
     .fromTo(spans, { yPercent: 120 }, { yPercent: 0, duration: 0.85, stagger: 0.07 }, 0.42);
+  if (REDUCE_MOTION) zoomTl.timeScale(6);
 }
 
 /* 見たまま隣へ送る。いちいち壁へ戻して選び直させない */
@@ -2994,6 +3034,7 @@ function stepZoom(dir) {
   zoomTl
     .set(zoomCap, { opacity: 1 }, 0)
     .fromTo(spans, { yPercent: 120 }, { yPercent: 0, duration: 0.7, stagger: 0.05 }, 0.18);
+  if (REDUCE_MOTION) zoomTl.timeScale(6);
 }
 
 function closeZoom() {
@@ -3018,6 +3059,7 @@ function closeZoom() {
     .to(zoomCap, { opacity: 0, duration: 0.3, ease: "power2.in" }, 0)
     .to(r.backdrop.material, { opacity: 0, duration: 0.6 }, 0.1);
   returnToWall(mesh, zoomTl, 0, 0.85);
+  if (REDUCE_MOTION) zoomTl.timeScale(6);
 }
 
 /* 触れた写真のキャプション。写真の下辺に付いて回り、窓から出るように現れる */
@@ -3193,10 +3235,12 @@ const BEAT = {
 const segAt = (p, [a, b]) => THREE.MathUtils.clamp((p - a) / (b - a), 0, 1);
 const ease = (k) => k * k * (3 - 2 * k);
 let tl = null;                             /* 開閉を1本で持つGSAPタイムライン */
+let focusBeforeGallery = null;             /* 部屋を出た時、呼び出し元へフォーカスを戻すための記憶 */
 
 function openGallery(area) {
   if (galleryOpen || transitionActive || !area.photos) return;
   galleryOpen = true;
+  focusBeforeGallery = document.activeElement;
 
   /* 勢いよくスクロールした直後にホットスポットを踏むと、rig.target が
      まだこのエリアの t を行き過ぎた（あるいは手前で止まっている）ことがある。
@@ -3221,6 +3265,8 @@ function openGallery(area) {
     : "DRAG / SCROLL — 流す<br class=\"hud__hint__br\">CLICK — 大きく見る";
   hint.classList.remove("is-faded");
   roomBack.classList.add("is-visible");
+  roomBack.tabIndex = 0; /* 非表示中はTab順から外している。表示に合わせて戻す */
+  roomBack.focus(); /* キーボード操作の起点を、旅の外へ戻れるこのボタンに置く */
   transitionActive = true;
   if (tl) tl.kill();
 
@@ -3248,7 +3294,9 @@ function openGallery(area) {
       { value: 0.98, duration: 1.1, stagger: 0.06, ease: "power2.out" }, 0.5)
     .to(anchorsWrap, { opacity: 0, duration: 0.5 }, 0)
     .to(mine.map((a) => a.mat), { opacity: 0, duration: 0.7, ease: "power2.out" }, 0);
-  tl.timeScale(hasPlayedTransition ? 1.5 : 1);
+  /* reduced motionでは「移動を減らす」以上に「連続アニメーションそのもの」が
+     負荷になる人がいるため、演出を消すのではなく大幅に速めて実質即時にする */
+  tl.timeScale((hasPlayedTransition ? 1.5 : 1) * (REDUCE_MOTION ? 6 : 1));
   hasPlayedTransition = true;
 }
 
@@ -3268,6 +3316,13 @@ function closeGallery() {
   hint.textContent = IS_TOUCH ? "SWIPE — 綿毛を追う" : "SCROLL / DRAG — 綿毛を追う";
   hint.classList.add("is-faded");
   roomBack.classList.remove("is-visible");
+  roomBack.tabIndex = -1; /* 見えないボタンにTabで止まり、Enterで意図せず旅の外へ出てしまうのを防ぐ */
+  /* 部屋に入る前にフォーカスしていた場所（ホットスポット等）へ戻す。
+     その要素が消えている場合（ドット操作等）は無理に追わず諦める */
+  if (focusBeforeGallery && document.body.contains(focusBeforeGallery)) {
+    focusBeforeGallery.focus();
+  }
+  focusBeforeGallery = null;
   /* 次にこのシリーズを開いた時、見ていた位置から再開できるよう憶えておく。
      以前は毎回 startIdx=0（先頭）に戻り、22枚あるシリーズを見返すたびに
      最初から流し直す必要があった */
@@ -3283,10 +3338,18 @@ function closeGallery() {
   document.body.style.cursor = "";
   if (!tl) { galleryOpen = false; return; }
   transitionActive = true;
-  tl.timeScale(1.7).reverse(); /* 戻りは速く。往復のコストを下げる */
+  tl.timeScale(1.7 * (REDUCE_MOTION ? 6 : 1)).reverse(); /* 戻りは速く。往復のコストを下げる */
 }
 
 window.addEventListener("keydown", (e) => {
+  /* Spaceキーは、旅を進める操作にも部屋内で写真を開く操作にも割り当てて
+     いるが、ボタンにフォーカスがある状態でSpaceを押した場合は話が別。
+     本来は「そのボタンを押す」というブラウザ標準の動作を期待しているのに、
+     このグローバルハンドラが割り込んで奪ってしまっていた */
+  if (e.key === " " && e.target && e.target.closest &&
+      e.target.closest('button, a, input, textarea, select, [role="button"]')) {
+    return;
+  }
   /* 1枚を見ている間は矢印で送る */
   if (activeRoom && activeRoom.zoomed) {
     if (e.key === "ArrowRight" || e.key === "ArrowDown") { stepZoom(1); return; }
@@ -3500,6 +3563,10 @@ const loadTick = setInterval(() => {
     clearInterval(loadTick);
     loaderStatus.textContent = "READY";
     enterBtn.classList.add("is-ready");
+    /* opacity/pointer-eventsだけの制御だと、支援技術やフォーム送信は
+       「押せるボタン」として扱ってしまう。実際に押せるようになるまでは
+       意味的にもdisabledにしておく */
+    enterBtn.disabled = false;
   }
 }, 150);
 
