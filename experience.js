@@ -1397,6 +1397,12 @@ const MOBILE_LAYOUT = innerWidth <= 767;
 /* 操作ヒントの文言分岐用。画面幅ではなく実際の入力方式で判定する
    （タッチ対応の広い画面もあるため） */
 const IS_TOUCH = matchMedia("(pointer: coarse)").matches;
+/* ?debug=1 / ?trailer=1 は開発中の内部確認用。本番ドメインでも
+   誰でもURLに付けるだけで発火してしまうと、window.__xp経由で
+   内部stateが覗けたり、trailerモードが900フレームぶんの
+   レンダリング＋POSTを閲覧者のブラウザに走らせてしまう。
+   ローカル開発時（localhost / 127.0.0.1）だけ許可する */
+const DEV_TOOLS_ALLOWED = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
 const curve = new THREE.CatmullRomCurve3(
   [
     new THREE.Vector3(0, 1.6, MOBILE_LAYOUT ? 5.6 : 8), // 起点（冒頭のうしろ）
@@ -2827,7 +2833,9 @@ function bringToFront(mesh, tlLocal, at, dur) {
   const vh = 2 * D * Math.tan(THREE.MathUtils.degToRad(camera.fov * 0.5));
   const vw = vh * camera.aspect;
   /* 画面に収める基準は「プリントの実寸（クランプ前）」 */
-  const k = Math.min((vh * 0.86) / ROW_H, (vw * 0.74) / printW2);
+  /* モバイルは画面自体が狭く、PC想定の74%幅だと写真がひとまわり
+     小さく見えていた。タッチ端末は使える横幅の上限を引き上げる */
+  const k = Math.min((vh * 0.86) / ROW_H, (vw * (IS_TOUCH ? 0.90 : 0.74)) / printW2);
   const w2 = (printW2 + ROOM_PAD * 2) * k, h2 = (ROW_H + ROOM_PAD * 2) * k;
   _wp2.copy(camera.position).addScaledVector(_fwd, D).sub(r.group.position);
 
@@ -2939,6 +2947,14 @@ function openZoom(mesh) {
   mesh.renderOrder = 2; /* 下地と他の写真より必ず手前へ */
   zoomCapText(mesh, r.meshes.indexOf(mesh), r.meshes.length);
   const spans = zoomCap.querySelectorAll("span");
+  /* 通常の操作ヒント・波線・クレジットはzoomCapと同じ下部領域を使うため、
+     特に375px前後のモバイルでは重なって読めなくなっていた。
+     1枚を見ている間だけ退かせる */
+  hint.classList.add("is-faded");
+  const waveEl = document.querySelector(".hud__wave");
+  const creditsEl = document.querySelector(".hud__credits");
+  if (waveEl) waveEl.classList.add("is-zoom-hidden");
+  if (creditsEl) creditsEl.classList.add("is-zoom-hidden");
 
   if (zoomTl) zoomTl.kill();
   zoomTl = gsap.timeline({ defaults: { ease: "expo.out" } });
@@ -2985,6 +3001,13 @@ function closeZoom() {
   if (!r || !r.zoomed) return;
   const mesh = r.zoomed;
   r.zoomed = null;
+  /* openZoomで退かせた部屋のヒント・波線・クレジットを戻す。
+     部屋自体を出る場合は、この直後に closeGallery が改めて隠す */
+  hint.classList.remove("is-faded");
+  const waveEl = document.querySelector(".hud__wave");
+  const creditsEl = document.querySelector(".hud__credits");
+  if (waveEl) waveEl.classList.remove("is-zoom-hidden");
+  if (creditsEl) creditsEl.classList.remove("is-zoom-hidden");
   lockMesh(r, mesh); /* 戻り切るまでは毎フレーム処理に触らせない */
   if (zoomTl) zoomTl.kill();
   zoomTl = gsap.timeline({
@@ -3033,7 +3056,7 @@ function updateRoomCaption(hit, dt) {
 const roomScroll = { current: 0, target: 0, ease: IS_TOUCH ? 0.16 : 0.07 };
 let activeRoom = null;
 /* ?debug=1 のときだけ内部状態を覗けるようにする（挙動の切り分け用） */
-if (new URLSearchParams(location.search).get("debug") === "1") {
+if (DEV_TOOLS_ALLOWED && new URLSearchParams(location.search).get("debug") === "1") {
   window.__xp = {
     get room() { return activeRoom; },
     get open() { return galleryOpen; },
@@ -3235,6 +3258,13 @@ function openGallery(area) {
 function closeGallery() {
   if (activeRoom && activeRoom.zoomed) closeZoom(); /* 見ていた1枚を壁へ戻してから出る */
   if (zoomCap) zoomCap.style.opacity = "0";
+  /* updateRoomCaption() は updateRoom() の中でしか呼ばれず、updateRoom() は
+     activeRoom が無いと即returnする。そのため退出後はこのキャプションの
+     更新が止まり、直前に触れていた写真名が旅の画面やCONTACTまで
+     居残っていた。退出の瞬間に確実に消す */
+  if (roomCap) { roomCap.style.opacity = "0"; }
+  if (roomCapSpan) roomCapSpan.textContent = "";
+  capShown = 0; capFor = null;
   hint.textContent = IS_TOUCH ? "SWIPE — 綿毛を追う" : "SCROLL / DRAG — 綿毛を追う";
   hint.classList.add("is-faded");
   roomBack.classList.remove("is-visible");
@@ -3610,7 +3640,7 @@ const clock = new THREE.Clock();
 /* ?debug=1 の時だけ、実測を画面に出す。
    こちらの環境では Edge を測れないので、数字を見える所に置く */
 const perfBox = (() => {
-  if (new URLSearchParams(location.search).get("debug") !== "1") return null;
+  if (!DEV_TOOLS_ALLOWED || new URLSearchParams(location.search).get("debug") !== "1") return null;
   const el = document.createElement("div");
   el.style.cssText =
     "position:fixed;right:10px;bottom:10px;z-index:99;font:11px/1.5 ui-monospace,monospace;" +
@@ -3668,7 +3698,7 @@ function adaptQuality(dt) {
    サーバーへ送って保存する。時間は実時間ではなく固定の刻みで進めるので、
    重い環境でもコマ落ちせず、毎回まったく同じ絵が撮れる。
 ============================================================ */
-const TRAILER = new URLSearchParams(location.search).get("trailer") === "1";
+const TRAILER = DEV_TOOLS_ALLOWED && new URLSearchParams(location.search).get("trailer") === "1";
 if (TRAILER) {
   const W = 1080, H = 1920, FPS = 30, SECONDS = 30;
   const TOTAL = FPS * SECONDS;

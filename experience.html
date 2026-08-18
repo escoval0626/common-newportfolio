@@ -251,6 +251,10 @@
       color: var(--ink-mid); text-align: center; line-height: 2.2; max-width: 34em;
       padding: 0 24px;
     }
+    /* 文節ごとに区切り、区切りの間だけで折り返す。
+       文節内で単語が割れると「旅に出ま／す。」のように演出ではなく
+       組版崩れに見えてしまうため、狭い画面でも文節の途中では折らない */
+    .loader__desc span { white-space: nowrap; }
     .loader__enter {
       margin-top: 12px; padding: 16px 54px;
       background: none; border: 1px solid var(--ink); color: var(--ink);
@@ -272,6 +276,7 @@
       padding: 24px clamp(20px, 4vw, 56px);
     }
     .hud__logo {
+      position: relative;
       font-size: 13px; letter-spacing: 0.2em; color: var(--ink);
       background: none; border: 0; padding: 0; font-family: inherit; cursor: pointer;
       transition: color 0.3s;
@@ -283,6 +288,7 @@
        枚数表示（旧 .hud__room-pos）と並べていたモバイル幅では、
        nowrap が無いと3行に折り返してみっともなかったため単独でも防いでおく */
     .hud__back {
+      position: relative;
       background: none; border: 0; padding: 0; margin: 0; cursor: pointer;
       font-family: var(--font-latin); font-size: 11px; letter-spacing: 0.3em;
       color: var(--ink-mid); white-space: nowrap;
@@ -295,6 +301,7 @@
        すぐ辿り着けるよう、HUDに常時置いておく（部屋の中や、まさにCONTACTに
        いる間は自明・過剰なので隠す） */
     .hud__contact {
+      position: relative;
       background: none; border: 0; padding: 0; margin: 0; cursor: pointer;
       font-family: var(--font-latin); font-size: 11px; letter-spacing: 0.3em;
       color: var(--ink-mid); white-space: nowrap;
@@ -302,6 +309,12 @@
       pointer-events: auto; /* .hud は全体が pointer-events:none。これが無いと押せない */
     }
     .hud__contact:hover, .hud__contact:focus-visible { color: var(--ink); }
+    /* ロゴ／BACK／CONTACTは見た目の文字サイズのままだと当たり判定が
+       10px前後しかなく、指で正確に狙いづらい。見た目を変えずに
+       疑似要素で当たり判定だけをWCAG目安の44px角に近づける */
+    .hud__logo::before, .hud__back::before, .hud__contact::before {
+      content: ""; position: absolute; inset: -15px -8px;
+    }
     .hud__contact.is-hidden { opacity: 0; pointer-events: none; }
     /* SNS：細い線の円だけの控えめなアイコン。常時表示 */
     .hud__social { display: flex; align-items: center; gap: 10px; }
@@ -394,6 +407,11 @@
       transition: color 0.3s;
     }
     .xp-hotspot:hover { color: var(--ink); }
+    /* 文字の実寸(13px)だけでは指で狙いにくいため、見た目は変えず
+       当たり判定だけ拡張する */
+    .xp-hotspot::before {
+      content: ""; position: absolute; inset: -14px -10px;
+    }
     /* 下線はホバー待ちにせず、常に静かに息をして「触れられる」ことを伝える。
        筆で引いた線のように左から現れ、また薄れる＝ギャラリー見出しの罫と同じ語彙 */
     .xp-hotspot__label { position: relative; padding-bottom: 4px; }
@@ -560,14 +578,18 @@
     .hud__credits {
       position: absolute; right: clamp(18px, 3vw, 44px); bottom: 12px;
       font-size: 8px; letter-spacing: 0.14em; color: var(--ink-dim);
-      opacity: 0.75;
+      opacity: 0.75; transition: opacity 0.3s;
     }
 
     /* ===== 波線スクロールインジケーター ===== */
     .hud__wave {
       position: absolute; left: 50%; bottom: 44px; transform: translateX(-50%);
       width: 46px; height: 14px; overflow: hidden; opacity: 0.7;
+      transition: opacity 0.3s;
     }
+    /* 1枚を大きく見ている間、zoom-capと同じ下部領域を使う波線・クレジットを退かす。
+       特にモバイル幅ではこれらが zoom-cap のテキストと重なって読めなくなっていた */
+    .hud__wave.is-zoom-hidden, .hud__credits.is-zoom-hidden { opacity: 0; }
     .hud__wave svg { display: block; animation: waveSlide 2.2s linear infinite; }
     @keyframes waveSlide { from { transform: translateX(0); } to { transform: translateX(-23px); } }
 
@@ -626,11 +648,14 @@
       .hud__logo { font-size: 12px; letter-spacing: 0.1em; }
       .hud__head-right { gap: 5px; }
       .hud__back { font-size: 9.5px; letter-spacing: 0.12em; }
-      /* CONTACTボタン追加で合計幅が再び超過（375px幅で実測+35px。
-         .hud__back は非表示時も "← BACK TO JOURNEY" 分の幅をレイアウトに
-         持ち続けるため、CONTACT追加分がそのまま超過になっていた）。
-         padding/gapも詰めた上で、これ自体もさらに縮める */
-      .hud__contact { font-size: 8px; letter-spacing: 0.06em; }
+      /* 以前はCONTACTを8pxまで潰して幅超過を回避していたが、視認性の
+         犠牲が大きすぎた（真因は隣の .hud__back — 非表示時も
+         "← BACK TO JOURNEY" 分の幅をレイアウトに持ち続けていたこと）。
+         .hud__back と .hud__contact は同時に見えることが無いので、
+         非表示時は display:none にして幅そのものを手放し、
+         空いた分でCONTACTの文字サイズを読める大きさまで戻す */
+      .hud__back:not(.is-visible) { display: none; }
+      .hud__contact { font-size: 11px; letter-spacing: 0.08em; }
 
       /* タップ領域をWCAG目安の44pxまで拡げる。見た目のドット自体は
          疑似要素で小さく描き、視覚的な印象は変えない */
@@ -722,7 +747,7 @@
     <p class="loader__brand">COMMON — EXPERIENCE</p>
     <p class="loader__status" id="loaderStatus">LOADING 0%</p>
     <div class="loader__bar"><span id="loaderBar"></span></div>
-    <p class="loader__desc">一輪のタンポポから、綿毛がひとつ旅に出ます。<br />その行方を追って、六つの風景を巡ってください。</p>
+    <p class="loader__desc"><span>一輪のタンポポから、</span><span>綿毛がひとつ旅に出ます。</span><br /><span>その行方を追って、</span><span>六つの風景を巡ってください。</span></p>
     <button class="loader__enter" id="enterBtn">ENTER</button>
   </div>
 
