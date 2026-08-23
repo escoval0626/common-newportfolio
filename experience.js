@@ -2042,9 +2042,15 @@ window.addEventListener("pointermove", (e) => {
        意図せずズームが開いてしまう */
     dragMoved += Math.hypot(dx, dy);
     if (activeRoom) {
-      /* 部屋では横に掴んで流す */
+      /* 部屋では横に掴んで流す。target だけ動かして current を
+         updateRoom側のeasingで追いつかせる作りだと、ドラッグ中もずっと
+         「1テンポ遅れてついてくる」慣性が乗り、指に吸い付かない
+         もっさりした操作感になっていた。ドラッグ中は current も同時に
+         動かして指に1:1で追従させ、easing（惰性）は手を離した後の
+         スナップやキー送りだけに残す */
       activeRoom.snapPending = false;
       roomScroll.target -= dx * 0.016;
+      roomScroll.current = roomScroll.target;
       lastX = e.clientX; lastY = e.clientY;
       rig.lastInput = performance.now();
       return;
