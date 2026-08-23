@@ -2020,12 +2020,17 @@ window.addEventListener("wheel", (e) => {
 }, { passive: true });
 
 let dragging = false, dragMoved = 0, lastY = 0, lastX = 0;
+/* preventDefaultを一切呼ばない（スクロール制御はcanvasのtouch-action:noneに
+   任せている）ので、passive:trueを明示してブラウザに「このリスナーが
+   スクロール/ジェスチャをブロックする可能性は無い」と伝える。
+   passive指定が無いと、モバイルブラウザは念のためこのハンドラの完了を
+   待ってからコンポジットすることがあり、ドラッグの追従が遅れて見えていた */
 window.addEventListener("pointerdown", (e) => {
   if (!rig.entered) return;
   if (galleryOpen && !activeRoom) return;
   dragging = true; dragMoved = 0; lastY = e.clientY; lastX = e.clientX;
   document.body.classList.add("dragging");
-});
+}, { passive: true });
 window.addEventListener("pointermove", (e) => {
   rig.mouse.x = (e.clientX / innerWidth) * 2 - 1;
   rig.mouse.y = -(e.clientY / innerHeight) * 2 + 1;
@@ -2050,7 +2055,7 @@ window.addEventListener("pointermove", (e) => {
     rig.lastInput = performance.now();
     hint.classList.add("is-faded");
   }
-});
+}, { passive: true });
 /* pointercancel（ブラウザにジェスチャを奪われた時）も pointerup と同じ後始末をする。
    これが無いと dragging=true のまま固着し、以後ドラッグが二重に効く */
 for (const evName of ["pointerup", "pointercancel"]) {
@@ -2822,7 +2827,7 @@ function ensureRoomTexture(m) {
   const d = m.userData;
   if (d.loaded || d.loading) return;
   d.loading = true;
-  const tex = new THREE.TextureLoader().load(thumbUrl(d.url), () => {
+  const tex = texLoader.load(thumbUrl(d.url), () => {
     d.loading = false;
     d.loaded = true;
     d.tex = tex;
@@ -2843,7 +2848,7 @@ function ensureFullTexture(mesh) {
   const d = mesh.userData;
   if (d.isFull || d.fullLoading) return;
   d.fullLoading = true;
-  new THREE.TextureLoader().load(d.url, (fullTex) => {
+  texLoader.load(d.url, (fullTex) => {
     d.fullLoading = false;
     d.isFull = true;
     fullTex.colorSpace = THREE.SRGBColorSpace;
@@ -3457,15 +3462,21 @@ function openGallery(area) {
   transitionActive = true;
   if (tl) tl.kill();
 
-  /* このエリアの3Dコラージュ絵（addArtwork）は、部屋（カルーセル）に入っても
-     元の位置に残ったまま描画され続ける。updateArtworks は galleryOpen 中
-     「タイムライン側が濃度を持つので触らない」前提で自身の制御を止めるが、
-     このタイムラインには絵を隠す処理が無く、広角のFOVでは絵が周辺視野に
-     入り込み、カルーセル写真の背後に透けて残って見えていた */
+  /* このエリアの3Dコラージュ絵（addArtwork、線画+水彩の点描が1枚あたり
+     数千個規模）は、部屋（カルーセル）に入っても元の位置に残ったまま
+     描画され続けていた。opacityを0にしても、GPU側では透明な点群として
+     頂点シェーダー・フラグメントシェーダーの計算コストがそのままかかる。
+     モバイルではこれがカルーセル操作のもたつきとして体感されていたため、
+     フェードで見えなくなった後は visible=false にして描画自体を止める */
   const mine = artworks.filter((a) => a.area === area);
+  room.artworks = mine; /* closeGalleryから、戻す対象として参照する */
 
   tl = gsap.timeline({
-    onComplete: () => { transitionActive = false; activeRoom = room; },
+    onComplete: () => {
+      transitionActive = false;
+      activeRoom = room;
+      mine.forEach((a) => { a.group.visible = false; });
+    },
     onReverseComplete: () => {
       transitionActive = false;
       galleryOpen = false;
@@ -3520,6 +3531,11 @@ function closeGallery() {
       if (d < bestD) { bestD = d; bestIdx = i; }
     });
     activeRoom.startIdx = bestIdx;
+  }
+  /* openGallery側で描画を止めたエリアの絵を、フェードインが効くよう
+     先に見える状態へ戻す（visible=falseのままだとopacityを戻しても映らない） */
+  if (activeRoom && activeRoom.artworks) {
+    activeRoom.artworks.forEach((a) => { a.group.visible = true; });
   }
   activeRoom = null;              /* 先に操作対象を旅へ戻す */
   document.body.style.cursor = "";
