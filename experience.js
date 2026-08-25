@@ -55,8 +55,14 @@ try {
   renderer = new THREE.WebGLRenderer({
     canvas,
     /* 粒子にはMSAAはほぼ効かないが、下層ページの写真は板の縁が出るので必要。
-       粒子を大幅に削って余裕ができたぶん、ここに回す */
-    antialias: true,
+       粒子を大幅に削って余裕ができたぶん、ここに回す。
+       ただしタッチ端末（非力なモバイルGPU）ではMSAAのコスト自体が
+       カルーセルの横送りのもたつきとして体感されており、板の縁は
+       シェーダー側でも自前にアンチエイリアシングしている（fwidthベース）
+       ため、タッチ端末ではMSAAを切って浮いた分をフレームレートに回す */
+    /* IS_TOUCH の定義はこのファイルの後方（renderer初期化より後）にあるため、
+       ここでは同じ判定式をそのまま書く（TDZで参照できない） */
+    antialias: !(matchMedia("(pointer: coarse)").matches || (navigator.maxTouchPoints || 0) > 0),
     powerPreference: "high-performance",
   });
 } catch (e) {
@@ -2818,8 +2824,11 @@ ROOM_PLACEHOLDER_TEX.needsUpdate = true;
 /* タッチ端末はGPU/帯域が細く、同時に実体化する枚数が多いほど
    フレームが重くなり、横送り自体がもっさりして見える。窓を絞って
    同時ロード数を減らす（PCと同じ6枚窓のままでは、実機での重さが
-   横スクロールの追従の遅さとして体感されていた） */
-const ROOM_WINDOW_RADIUS = (ROW_H * 1.5 + ROOM_GAP) * (IS_TOUCH ? 3.5 : 6);
+   横スクロールの追従の遅さとして体感されていた）。3.5枚窓
+   （＝前後合わせて実質7枚同時実体化）でもiPhone実機ではまだ重く、
+   画面に同時に見えるのはせいぜい1〜2枚なので、前後2枚ぶんの
+   先読みが確保できる線まで絞る */
+const ROOM_WINDOW_RADIUS = (ROW_H * 1.5 + ROOM_GAP) * (IS_TOUCH ? 2.2 : 6);
 
 /* 壁掛け表示は3D空間内の小さな板で、画面上の占有率も低い。
    フル解像度（最大2048px、平均400KB超）は明らかに過剰品質なので、
