@@ -1956,9 +1956,6 @@ buildStaticGallery();
 
 /* 綿毛ガイド */
 let fluff = null;
-/* ローディング専用の綿毛群（更新式はupdateLoaderFluffCloud参照） */
-let loaderFluffs = [];
-let loadProgress = 0;
 
 /* タンポポ本体（buildHero）と地面の霞（buildWorldBase）は、粒子を手続き的に
    push するだけの純関数で、GLBモデル（loaded[key]）には一切依存しない。
@@ -1984,23 +1981,6 @@ if (loaderFluffRenderer) {
   loaderFluffScene.add(fluff);
 }
 fluff.position.copy(HERO_HEAD);
-/* ローディング画面演出：本体とは別に、画面外周からHERO_HEADへ集まって
-   くる使い捨ての綿毛群。読み込みが進むほど旅の起点へ寄り、ENTERが
-   押せる瞬間には本体の周りに集結している（updateLoaderFluffCloud参照）。
-   モバイルは描画負荷を抑えるため数を絞る */
-if (loaderFluffRenderer) {
-  const LOADER_FLUFF_COUNT = IS_TOUCH ? 4 : 7;
-  for (let i = 0; i < LOADER_FLUFF_COUNT; i++) {
-    const lf = makeFluff();
-    scene.remove(lf);
-    loaderFluffScene.add(lf);
-    lf.userData.angle = (i / LOADER_FLUFF_COUNT) * Math.PI * 2 + Math.random() * 0.5;
-    lf.userData.radiusK = 1.1 + Math.random() * 0.35;
-    lf.userData.spinDir = Math.random() < 0.5 ? -1 : 1;
-    lf.userData.phase = Math.random() * Math.PI * 2;
-    loaderFluffs.push(lf);
-  }
-}
 AREAS.forEach((ar) => { ar.currentW = 0; });
 
 /* 全読込→シーン構築 */
@@ -2066,9 +2046,6 @@ const _fp = new THREE.Vector3();
 const _fluffRight = new THREE.Vector3();
 const _fluffNear = new THREE.Vector3();
 const UP = new THREE.Vector3(0, 1, 0);
-const _lfRight = new THREE.Vector3();
-const _lfUp = new THREE.Vector3();
-const _lfPos = new THREE.Vector3();
 
 /* Firefox等は deltaMode=1（行単位、1ノッチ≒3）を返す。ピクセル値前提の
    係数のままだとChrome比で約1/40しか進まず、実質操作不能になる */
@@ -2378,39 +2355,6 @@ function updateFluff(t, dt) {
     for (const m of fluff.userData.mats) m.opacity = m.userData.baseOp * hide;
   }
   fluff.rotation.y += dt * 0.3;
-}
-
-/* ローディング専用の綿毛群：画面の外周から旅の起点（HERO_HEAD＝ENTERの
-   視覚的な着地点）へ、読み込み進捗に比例して集まってくる。本体の綿毛
-   （旅の主役、1体だけ）とは別individualで、ENTERで消える使い捨て演出。
-   カメラは固定の手持ち揺れのみ（updateループ内でlookAt(HERO_HEAD)済み）
-   なので、都度quaternionから視錐台のright/upを取り直せば正しく画面外周
-   に収まる */
-function updateLoaderFluffCloud(t, dt, p) {
-  if (!loaderFluffs.length) return;
-  const dist = camera.position.distanceTo(HERO_HEAD);
-  const vh = dist * Math.tan(THREE.MathUtils.degToRad(camera.fov * 0.5));
-  const vw = vh * camera.aspect;
-  _lfRight.set(1, 0, 0).applyQuaternion(camera.quaternion);
-  _lfUp.set(0, 1, 0).applyQuaternion(camera.quaternion);
-  const eased = p * p * (3 - 2 * p);
-  const driftAmp = REDUCE_MOTION ? 0 : 1;
-  for (const lf of loaderFluffs) {
-    const d = lf.userData;
-    const ang = d.angle + t * 0.07 * d.spinDir;
-    const rk = d.radiusK * (1 - eased * 0.95);
-    _lfPos.copy(HERO_HEAD)
-      .addScaledVector(_lfRight, Math.cos(ang) * vw * rk)
-      .addScaledVector(_lfUp, Math.sin(ang) * vh * rk);
-    _lfPos.y += Math.sin(t * 1.3 + d.phase) * 0.05 * driftAmp * (1 - eased);
-    lf.position.copy(_lfPos);
-    lf.rotation.z = Math.sin(t * 0.8 + d.phase) * 0.15;
-    lf.rotation.y += dt * 0.25 * d.spinDir;
-    if (d.mats) {
-      const op = 1 - eased * 0.55;
-      for (const m of d.mats) m.opacity = m.userData.baseOp * op;
-    }
-  }
 }
 
 /* ============================================================
@@ -2918,8 +2862,8 @@ function makeRoomPhotoMat(tex) {
         vec3 img = srgbToLinear(texture2D(uTex, clamp(uv, 0.0, 1.0)).rgb);
         /* 露出を持ち上げる（紙・影には掛けず、写真本体だけ）。
            乗算だけだとハイライトから飽和するので、暗部を持ち上げる補正も併用する。
-           元の値（0.82 / 1.15）はカルーセルで暗く沈んで見えたため強化 */
-        img = pow(img, vec3(0.75)) * 1.22;
+           元の値（0.82 / 1.15→0.75 / 1.22）からさらにもう一段明るく */
+        img = pow(img, vec3(0.70)) * 1.27;
         img = linearToSrgb(img); /* ここでsRGB値に戻す。以降は他の色と同じ空間で混ぜる */
         img = mix(img, img * 1.06, circle * uHover);
 
@@ -3487,9 +3431,6 @@ if (DEV_TOOLS_ALLOWED && new URLSearchParams(location.search).get("debug") === "
     openGallery, closeGallery: () => closeGallery(), AREAS,
     camera, scene, THREE,
     rig, updateRoom, artworks,
-    get loadProgress() { return loadProgress; },
-    set loadProgress(v) { loadProgress = v; },
-    loaderFluffs,
     /* 実際に画面へ描かれている量を数える。推測で軽くしても意味がないので */
     stats() {
       let pts = 0, drawn = 0, objs = 0;
@@ -3967,7 +3908,6 @@ if (hudContact) {
 const loadTick = setInterval(() => {
   const real = Math.round((loadedCount / totalCount) * 100);
   loaderStatus.textContent = `LOADING ${real}%`;
-  loadProgress = real / 100;
   if (loaderRing) loaderRing.style.strokeDashoffset = String(LOADER_RING_CIRC * (1 - real / 100));
   /* 以前は全パネル画像（写真・コラージュ、200枚以上）を含む panelPending===0 まで
      待たせていたが、これが初回訪問者を最も長く足止めする箇所だった。
@@ -3998,18 +3938,6 @@ enterBtn.addEventListener("click", () => {
   if (loaderFluffRenderer && fluff) {
     loaderFluffScene.remove(fluff);
     scene.add(fluff);
-  }
-  /* 使い捨ての綿毛群は役目を終えたので破棄する（メモリ解放） */
-  if (loaderFluffs.length) {
-    for (const lf of loaderFluffs) {
-      loaderFluffScene.remove(lf);
-      lf.traverse((o) => {
-        if (o.geometry) o.geometry.dispose();
-        const mats = Array.isArray(o.material) ? o.material : o.material ? [o.material] : [];
-        mats.forEach((m) => m.dispose());
-      });
-    }
-    loaderFluffs.length = 0;
   }
   /* このクリックは window まで bubble し、そちらのレイキャストハンドラは
      rig.entered を見て発火を決めている。同じイベント内で同期的に true にすると、
@@ -4552,7 +4480,6 @@ renderer.setAnimationLoop(() => {
   }
 
   updateFluff(t, dt);
-  if (!rig.entered) updateLoaderFluffCloud(t, dt, loadProgress);
   updateContactBloom(dt);
   updatePanels();
   updateArtworks();
