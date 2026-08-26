@@ -1940,14 +1940,23 @@ buildStaticGallery();
 /* 綿毛ガイド */
 let fluff = null;
 
+/* タンポポ本体（buildHero）と地面の霞（buildWorldBase）は、粒子を手続き的に
+   push するだけの純関数で、GLBモデル（loaded[key]）には一切依存しない。
+   以前はGLB読み込み完了までまとめて待ってから組んでいたため、ローディング
+   画面の間、背後の3Dシーンが空っぽのままだった。これでは「ローディングの
+   ヴェール越しにタンポポが見える」という冒頭の狙いが成立しない。
+   GLB依存の buildTransitObjects（遠景の木立、placeScan経由でloaded[key]を
+   参照する）だけ読み込み完了後に残し、それ以外は先に組んで最初のフレームから
+   見せる */
+buildWorldBase();
+buildHero();
+AREAS.forEach((ar) => { ar.currentW = 0; });
+
 /* 全読込→シーン構築 */
 Promise.all(
   Object.entries(MODELS).map(([k, u]) => loadModel(k, u))
 ).then(() => {
-  buildWorldBase();
   buildTransitObjects();
-  buildHero();
-  AREAS.forEach((ar) => { ar.currentW = 0; });
   /* 各エリアのbuild()は、コラージュ絵（scenes/*.png、シリーズ合計30MB超）の
      ダウンロードを開始する副作用を持つ。7エリア分を同時に開始すると、
      ENTER直後に必要な最初のエリア分の帯域を、まだ訪れてもいない後方の
@@ -3762,7 +3771,6 @@ window.addEventListener("pointermove", (e) => {
 ============================================================ */
 const loader = document.getElementById("loader");
 const loaderStatus = document.getElementById("loaderStatus");
-const loaderBar = document.getElementById("loaderBar");
 const enterBtn = document.getElementById("enterBtn");
 const hud = document.getElementById("hud");
 const hint = document.getElementById("hint");
@@ -3833,7 +3841,6 @@ if (hudContact) {
 const loadTick = setInterval(() => {
   const real = Math.round((loadedCount / totalCount) * 100);
   loaderStatus.textContent = `LOADING ${real}%`;
-  if (loaderBar) loaderBar.style.width = `${real}%`;
   /* 以前は全パネル画像（写真・コラージュ、200枚以上）を含む panelPending===0 まで
      待たせていたが、これが初回訪問者を最も長く足止めする箇所だった。
      3D空間の構造（モデル＋配置）さえ整えば旅は始められ、写真は各情景に

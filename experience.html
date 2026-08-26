@@ -4,7 +4,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Common — Sho Kitago</title>
-  <meta name="description" content="Common — 写真家 北郷 将 のポートフォリオ" />
+  <!-- 説明文は日英併記。国内の閲覧者に加えて、海外からの流入・
+       SNSカード・海外ギャラリーサイトの審査でも中身が伝わるようにする
+       （以前は「写真家 北郷 将 のポートフォリオ」だけで、何が体験できる
+       サイトなのかが読み取れなかった） -->
+  <meta name="description" content="一粒の綿毛を追って、七つの情景を巡る。写真家・北郷将のインタラクティブ・ポートフォリオ。 / An interactive 3D portfolio by photographer Sho Kitago — follow a single dandelion seed through seven quiet scenes." />
   <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
   <link rel="canonical" href="https://www.commonphotograph.com/" />
 
@@ -13,17 +17,20 @@
   <meta property="og:site_name" content="Common — Sho Kitago" />
   <meta property="og:url" content="https://www.commonphotograph.com/" />
   <meta property="og:title" content="Common — Sho Kitago" />
-  <meta property="og:description" content="Common — 写真家 北郷 将 のポートフォリオ" />
+  <meta property="og:description" content="一粒の綿毛を追って、七つの情景を巡る。写真家・北郷将のインタラクティブ・ポートフォリオ。 / An interactive 3D portfolio by photographer Sho Kitago — follow a single dandelion seed through seven quiet scenes." />
   <meta property="og:image" content="https://www.commonphotograph.com/assets/photos/xp/landscape.jpg" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
-  <meta property="og:image:alt" content="Common — 写真家 北郷 将 のポートフォリオ" />
+  <meta property="og:image:alt" content="朝靄の立つ水辺。木立の奥に二人の人影が並び、水面に枝影が映っている。 / Two figures among misty trees at the water's edge, branches reflected on the surface." />
   <meta property="og:locale" content="ja_JP" />
+  <!-- 詩コピー・プロフィール・作品キャプションはすべて日英併記なので、
+       英語圏からの参照でも内容が読める旨を明示する -->
+  <meta property="og:locale:alternate" content="en_US" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Common — Sho Kitago" />
-  <meta name="twitter:description" content="Common — 写真家 北郷 将 のポートフォリオ" />
+  <meta name="twitter:description" content="一粒の綿毛を追って、七つの情景を巡る。写真家・北郷将のインタラクティブ・ポートフォリオ。 / An interactive 3D portfolio by photographer Sho Kitago — follow a single dandelion seed through seven quiet scenes." />
   <meta name="twitter:image" content="https://www.commonphotograph.com/assets/photos/xp/landscape.jpg" />
-  <meta name="twitter:image:alt" content="Common — 写真家 北郷 将 のポートフォリオ" />
+  <meta name="twitter:image:alt" content="朝靄の立つ水辺。木立の奥に二人の人影が並び、水面に枝影が映っている。 / Two figures among misty trees at the water's edge, branches reflected on the surface." />
 
   <script type="application/ld+json">
   {
@@ -35,6 +42,8 @@
         "name": "Sho Kitago",
         "alternateName": "北郷 将",
         "jobTitle": "Photographer",
+        "description": "Photographer based in Nagareyama, Chiba. Shooting with old lenses, he records the light, space, and textured stillness of everyday life.",
+        "knowsLanguage": ["ja", "en"],
         "url": "https://www.commonphotograph.com/",
         "email": "mailto:escoval0626@gmail.com",
         "address": { "@type": "PostalAddress", "addressLocality": "Nagareyama", "addressRegion": "Chiba", "addressCountry": "JP" },
@@ -263,27 +272,41 @@
     }
 
     /* ===== LOADER（本家 loader-experience のUX構造を踏襲） ===== */
+    /* 背後の3Dシーンを完全に隠す不透明な幕ではなく、透ける乳白のヴェール。
+       読み込みが進むとタンポポが霧の奥に現れ、ENTERでこのヴェールが晴れて
+       そのまま旅に入る（画面の切り替わりを作らない）。
+       canvasのクリア色(#eeedea)よりわずかに明るい紙の色を重ねることで、
+       霧そのものに見せている */
     .loader {
       position: fixed; inset: 0; z-index: 100;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
-      gap: 26px; background: var(--bg);
-      transition: opacity 1.1s ease, visibility 1.1s;
+      gap: 26px;
+      background: rgba(247, 246, 242, 0.82);
+      backdrop-filter: blur(3px);
+      -webkit-backdrop-filter: blur(3px);
+      transition: opacity 1.4s ease, visibility 1.4s, backdrop-filter 1.4s ease;
     }
+    .loader.is-hidden { backdrop-filter: blur(0px); -webkit-backdrop-filter: blur(0px); }
     .loader.is-hidden { opacity: 0; visibility: hidden; pointer-events: none; }
-    .loader__brand { font-size: 11px; letter-spacing: 0.4em; color: var(--ink-dim); }
-    .loader__status { font-size: 13px; letter-spacing: 0.34em; color: var(--ink); min-height: 1.4em; }
-    .loader__bar {
-      width: min(220px, 60vw); height: 1px; background: rgba(30, 26, 20, 0.18);
-      overflow: hidden;
+    /* 霧の奥にタンポポが像を結ぶため、文字は本編の詩コピーと同じく
+       白ハローを敷いて可読性を確保する */
+    .loader__brand {
+      font-size: 11px; letter-spacing: 0.4em; color: var(--ink-dim);
+      text-shadow: 0 0 6px #f7f6f2, 0 0 12px #f7f6f2;
     }
-    .loader__bar span {
-      display: block; height: 100%; width: 0%;
-      background: var(--ink-mid); transition: width 0.3s ease;
+    /* 進捗の数値は情報としては残すが、詩コピーより手前に出ないよう
+       ブランド行と同じ弱さに揃える（以前は --ink・13px で画面内の
+       最も強い要素になっており、主役であるはずの詩が負けていた） */
+    .loader__status {
+      font-size: 9px; letter-spacing: 0.4em; color: var(--ink-dim);
+      min-height: 1.4em;
+      text-shadow: 0 0 6px #f7f6f2, 0 0 12px #f7f6f2;
     }
     .loader__desc {
       font-family: var(--font-jp); font-size: 14px; letter-spacing: 0.18em;
       color: var(--ink-mid); text-align: center; line-height: 2.2; max-width: 34em;
       padding: 0 24px;
+      text-shadow: 0 0 6px #f7f6f2, 0 0 12px #f7f6f2, 0 0 3px #f7f6f2;
     }
     /* 文節ごとに区切り、区切りの間だけで折り返す。
        文節内で単語が割れると「旅に出ま／す。」のように演出ではなく
@@ -291,7 +314,8 @@
     .loader__desc span { white-space: nowrap; }
     .loader__enter {
       margin-top: 12px; padding: 16px 54px;
-      background: none; border: 1px solid var(--ink); color: var(--ink);
+      /* 霧の上に置くので、下地はごく薄く敷いて枠と文字を浮かせる */
+      background: rgba(247, 246, 242, 0.55); border: 1px solid var(--ink); color: var(--ink);
       font-family: var(--font-latin); font-size: 12px; letter-spacing: 0.4em;
       cursor: pointer; opacity: 0; pointer-events: none;
       transition: opacity 0.8s, background 0.35s, color 0.35s;
@@ -861,10 +885,16 @@
   </div>
 
   <!-- LOADER -->
+  <!-- ローディング画面は「幕」ではなく、旅立つ前の霧。
+       背後では最初のフレームから本編の3Dシーン（マクロのタンポポと綿毛）が
+       実際に描画されており、ここはその上に薄く掛かる乳白のヴェールとして
+       重ねるだけにする。読み込みが進むにつれてタンポポが霧の奥に像を結び、
+       ENTERで霧が晴れてそのまま旅が始まる＝画面の切り替わりが存在しない。
+       情景間の移動で使っている「霧が閉じ、着地で晴れる」のと同じ語彙で
+       冒頭を通す -->
   <div class="loader" id="loader">
     <p class="loader__brand">COMMON — EXPERIENCE</p>
     <p class="loader__status" id="loaderStatus">LOADING 0%</p>
-    <div class="loader__bar"><span id="loaderBar"></span></div>
     <p class="loader__desc"><span>一輪のタンポポから、</span><span>綿毛がひとつ旅に出ます。</span><br /><span>その行方を追って、</span><span>六つの風景を巡ってください。</span></p>
     <button class="loader__enter" id="enterBtn" disabled>ENTER</button>
   </div>
