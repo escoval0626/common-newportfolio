@@ -2031,7 +2031,7 @@ window.addEventListener("wheel", (e) => {
   hint.classList.add("is-faded");
 }, { passive: true });
 
-let dragging = false, dragMoved = 0, lastY = 0, lastX = 0;
+let dragging = false, dragMoved = 0, lastY = 0, lastX = 0, suppressNextClick = false;
 /* preventDefaultを一切呼ばない（スクロール制御はcanvasのtouch-action:noneに
    任せている）ので、passive:trueを明示してブラウザに「このリスナーが
    スクロール/ジェスチャをブロックする可能性は無い」と伝える。
@@ -2041,6 +2041,7 @@ window.addEventListener("pointerdown", (e) => {
   if (!rig.entered) return;
   if (galleryOpen && !activeRoom) return;
   dragging = true; dragMoved = 0; lastY = e.clientY; lastX = e.clientX;
+  suppressNextClick = false; /* 新しいジェスチャの開始で必ずクリアする */
   document.body.classList.add("dragging");
 }, { passive: true });
 window.addEventListener("pointermove", (e) => {
@@ -2059,10 +2060,20 @@ window.addEventListener("pointermove", (e) => {
          「1テンポ遅れてついてくる」慣性が乗り、指に吸い付かない
          もっさりした操作感になっていた。ドラッグ中は current も同時に
          動かして指に1:1で追従させ、easing（惰性）は手を離した後の
-         スナップやキー送りだけに残す */
+         スナップやキー送りだけに残す。
+         ただしこれをタップ操作にも無条件で適用すると、タッチパネル特有の
+         数px単位のジッター（触れているだけでも座標が細かく揺れ続ける）が
+         そのまま写真の列の高速な振動として見えてしまい（実機で報告された
+         "ブレブレ"）、かつ指を離した瞬間の写真の位置が毎回わずかにズレる
+         せいでクリック判定（raycaster）が外れやすくなっていた。
+         dragMoved が閾値（6px、クリック判定と同じ基準）を超えて
+         「実際に流すジェスチャだ」と確定するまでは何もしない
+         デッドゾーンにし、タップ中は写真を完全に静止させる */
       activeRoom.snapPending = false;
-      roomScroll.target -= dx * 0.016;
-      roomScroll.current = roomScroll.target;
+      if (dragMoved > 6) {
+        roomScroll.target -= dx * 0.016;
+        roomScroll.current = roomScroll.target;
+      }
       lastX = e.clientX; lastY = e.clientY;
       rig.lastInput = performance.now();
       return;
@@ -2076,12 +2087,25 @@ window.addEventListener("pointermove", (e) => {
 }, { passive: true });
 /* pointercancel（ブラウザにジェスチャを奪われた時）も pointerup と同じ後始末をする。
    これが無いと dragging=true のまま固着し、以後ドラッグが二重に効く */
-for (const evName of ["pointerup", "pointercancel"]) {
-  window.addEventListener(evName, () => {
-    dragging = false;
-    document.body.classList.remove("dragging");
-  });
-}
+window.addEventListener("pointerup", (e) => {
+  dragging = false;
+  document.body.classList.remove("dragging");
+  /* iOS Safari（Instagram等の内蔵ブラウザも含む）は、touch-action:none を
+     持つ要素上でのタップで、本来ブラウザが合成するはずの click イベントを
+     発火しないことがある既知の癖がある。この canvas は pull-to-refresh
+     対策で touch-action:none にしてあるため、タッチ由来の操作は click を
+     待たずここで直接判定する。マウス操作は従来どおり click イベントに任せる
+     （pointerType が touch/pen の場合だけここで処理し、後から本当に
+     click が発火しても suppressNextClick で二重発火を防ぐ） */
+  if (e.pointerType !== "mouse" && rig.entered && dragMoved <= 6) {
+    suppressNextClick = true;
+    handleActivate(e.clientX, e.clientY);
+  }
+});
+window.addEventListener("pointercancel", () => {
+  dragging = false;
+  document.body.classList.remove("dragging");
+});
 
 /* スクロール直結（リンク）＋情景で着地：
    途中で止めればそこに留まり（自動前進しない）、情景の"着地圏"に入って
@@ -3664,14 +3688,17 @@ window.addEventListener("keydown", (e) => {
   }
 });
 
-window.addEventListener("click", (e) => {
-  if (!rig.entered || dragMoved > 6) return;
+/* クリック相当の操作（写真を選ぶ／情景に入る）をまとめた関数。
+   マウスの click イベントと、タッチ由来の pointerup（下記）の
+   両方から呼ばれる */
+function handleActivate(clientX, clientY) {
+  if (!rig.entered) return;
   /* 部屋の中：写真を選ぶ／見終わって戻す */
   if (activeRoom) {
     if (activeRoom.zoomed) { closeZoom(); return; }
     raycaster.setFromCamera(new THREE.Vector2(
-      (e.clientX / innerWidth) * 2 - 1,
-      -(e.clientY / innerHeight) * 2 + 1
+      (clientX / innerWidth) * 2 - 1,
+      -(clientY / innerHeight) * 2 + 1
     ), camera);
     const h = raycaster.intersectObjects(activeRoom.meshes, false)[0];
     /* 壁へ戻るアニメーションの最中（locked）はクリックを無視する。
@@ -3682,8 +3709,8 @@ window.addEventListener("click", (e) => {
   }
   if (galleryOpen) return;
   raycaster.setFromCamera(new THREE.Vector2(
-    (e.clientX / innerWidth) * 2 - 1,
-    -(e.clientY / innerHeight) * 2 + 1
+    (clientX / innerWidth) * 2 - 1,
+    -(clientY / innerHeight) * 2 + 1
   ), camera);
   const objects = AREAS.map((a) => a.object).filter(Boolean);
   const hits = raycaster.intersectObjects(objects, false);
@@ -3703,6 +3730,13 @@ window.addEventListener("click", (e) => {
       rig.lastInput = performance.now();
     }
   }
+}
+window.addEventListener("click", (e) => {
+  /* タッチ由来のpointerupで既に処理済みなら、後から発火した（かもしれない）
+     このclickは無視する（suppressNextClickはpointerdownで必ずクリアされる） */
+  if (suppressNextClick) { suppressNextClick = false; return; }
+  if (dragMoved > 6) return;
+  handleActivate(e.clientX, e.clientY);
 });
 
 let hoverThrottle = 0;
