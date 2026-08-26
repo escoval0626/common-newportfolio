@@ -331,16 +331,53 @@
        文節内で単語が割れると「旅に出ま／す。」のように演出ではなく
        組版崩れに見えてしまうため、狭い画面でも文節の途中では折らない */
     .loader__desc span { white-space: nowrap; }
+    /* ENTER＝円環プログレス。矩形の枠線ボタンは、綿毛・タンポポ・
+       詩コピーの縦組みなど「丸み／縦の流れ」で組まれたこのサイトの
+       語彙の中で、ここだけ無地の四角がぽつんと浮いて見えていた。
+       円は綿毛の頭部と同じ形なので、旅の起点としての一体感が出る */
     .loader__enter {
-      margin-top: 12px; padding: 16px 54px;
-      /* 霧の上に置くので、下地はごく薄く敷いて枠と文字を浮かせる */
-      background: rgba(247, 246, 242, 0.55); border: 1px solid var(--ink); color: var(--ink);
-      font-family: var(--font-latin); font-size: 12px; letter-spacing: 0.4em;
-      cursor: pointer; opacity: 0; pointer-events: none;
-      transition: opacity 0.8s, background 0.35s, color 0.35s;
+      position: relative;
+      width: 148px; height: 148px;
+      margin-top: 8px;
+      border-radius: 50%;
+      background: rgba(247, 246, 242, 0.6);
+      border: none; padding: 0;
+      display: flex; align-items: center; justify-content: center;
+      /* 以前はボタン全体をopacity:0にして is-ready まで隠していたが、
+         それだと肝心の進捗リングまで読み込み中は見えなくなってしまい、
+         「進捗を視覚化する」目的を果たせていなかった。円とリングは
+         最初から見せ、is-readyまで隠すのは中のENTER文字だけにする */
+      cursor: pointer; pointer-events: none;
+      transition: transform 0.4s ease, background 0.4s ease;
     }
-    .loader__enter.is-ready { opacity: 1; pointer-events: auto; }
-    .loader__enter:hover { background: var(--ink); color: var(--bg); }
+    .loader__enter.is-ready { pointer-events: auto; }
+    .loader__enter:hover { transform: scale(1.045); background: rgba(247, 246, 242, 0.85); }
+    .loader__enter:active { transform: scale(0.98); }
+    .loader__ring { position: absolute; inset: 0; transform: rotate(-90deg); overflow: visible; }
+    .loader__ring-bg {
+      fill: none; stroke: rgba(28, 28, 28, 0.14); stroke-width: 1;
+    }
+    .loader__ring-fg {
+      fill: none; stroke: var(--ink); stroke-width: 1;
+      /* 円周 = 2πr（r=70） */
+      stroke-dasharray: 439.82;
+      stroke-dashoffset: 439.82;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 0.25s ease-out;
+    }
+    /* 環が閉じ切る（is-ready）と、細い環から実線の円へ切り替わり、
+       ボタンとしての実在感を出す */
+    .loader__enter.is-ready .loader__ring-bg { opacity: 0; transition: opacity 0.6s ease; }
+    .loader__enter.is-ready .loader__ring-fg { stroke-width: 1.4; }
+    .loader__enter-label {
+      position: relative; z-index: 1;
+      font-family: var(--font-latin); font-size: 12px; letter-spacing: 0.32em; color: var(--ink);
+      /* 環が閉じ切るまではENTERの文字を伏せておく。環（進捗）が
+         完成した瞬間に文字が浮かび上がる＝「進捗の到達点＝行動の起点」 */
+      opacity: 0;
+      transition: opacity 0.7s ease 0.15s;
+    }
+    .loader__enter.is-ready .loader__enter-label { opacity: 1; }
 
     /* ===== HUD ===== */
     .hud { position: fixed; inset: 0; z-index: 10; pointer-events: none; opacity: 0; visibility: hidden; transition: opacity 1.4s ease 0.6s; }
@@ -928,9 +965,21 @@
   <div class="loader" id="loader"></div>
   <div class="loader-content" id="loaderContent">
     <p class="loader__brand">COMMON — EXPERIENCE</p>
-    <p class="loader__status" id="loaderStatus">LOADING 0%</p>
     <p class="loader__desc"><span>一輪のタンポポから、</span><span>綿毛がひとつ旅に出ます。</span><br /><span>その行方を追って、</span><span>六つの風景を巡ってください。</span></p>
-    <button class="loader__enter" id="enterBtn" disabled>ENTER</button>
+    <!-- 進捗は「LOADING 42%」という文字だけで見せていたが、画面内で
+         いちばん強い情報量なのに素っ気なく、進捗そのものの手触りが
+         無かった。円環（＝タンポポの頭花・綿毛の丸みと呼応する形）を
+         ENTERボタン自身の外周に巻き、読み込みが進むほど環が満ちていく
+         ようにする。環が閉じた瞬間にそのままENTERへ変わる、という
+         「進捗の到達点＝行動の起点」を一体化させた見せ方 -->
+    <button class="loader__enter" id="enterBtn" disabled>
+      <svg class="loader__ring" viewBox="0 0 148 148" aria-hidden="true">
+        <circle class="loader__ring-bg" cx="74" cy="74" r="70" />
+        <circle class="loader__ring-fg" id="loaderRing" cx="74" cy="74" r="70" />
+      </svg>
+      <span class="loader__enter-label" id="enterLabel">ENTER</span>
+    </button>
+    <p class="loader__status" id="loaderStatus">LOADING 0%</p>
   </div>
 
   <!-- HUD -->

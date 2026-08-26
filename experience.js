@@ -3837,6 +3837,8 @@ const loader = document.getElementById("loader");
 const loaderContent = document.getElementById("loaderContent");
 const loaderStatus = document.getElementById("loaderStatus");
 const enterBtn = document.getElementById("enterBtn");
+const loaderRing = document.getElementById("loaderRing");
+const LOADER_RING_CIRC = 439.82; /* 2πr, r=70（experience.htmlのSVGと合わせる） */
 const hud = document.getElementById("hud");
 const hint = document.getElementById("hint");
 /* HTML側の初期文言はマウス操作前提。タッチ端末では最初の表示から入れ替える */
@@ -3906,6 +3908,7 @@ if (hudContact) {
 const loadTick = setInterval(() => {
   const real = Math.round((loadedCount / totalCount) * 100);
   loaderStatus.textContent = `LOADING ${real}%`;
+  if (loaderRing) loaderRing.style.strokeDashoffset = String(LOADER_RING_CIRC * (1 - real / 100));
   /* 以前は全パネル画像（写真・コラージュ、200枚以上）を含む panelPending===0 まで
      待たせていたが、これが初回訪問者を最も長く足止めする箇所だった。
      3D空間の構造（モデル＋配置）さえ整えば旅は始められ、写真は各情景に
@@ -3914,6 +3917,7 @@ const loadTick = setInterval(() => {
   if (loadedCount >= totalCount && sceneReady) {
     clearInterval(loadTick);
     loaderStatus.textContent = "READY";
+    if (loaderRing) loaderRing.style.strokeDashoffset = "0";
     enterBtn.classList.add("is-ready");
     /* opacity/pointer-eventsだけの制御だと、支援技術やフォーム送信は
        「押せるボタン」として扱ってしまう。実際に押せるようになるまでは
