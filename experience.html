@@ -281,9 +281,11 @@
       position: fixed; inset: 0; z-index: 100;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
       gap: 26px;
-      background: rgba(247, 246, 242, 0.82);
-      backdrop-filter: blur(3px);
-      -webkit-backdrop-filter: blur(3px);
+      /* 0.82は幕とほぼ同じ濃さで、背後の綿毛がほぼ見えなかった。
+         綿毛が「ヴェールの手前にいる」と感じられる濃さまで大きく下げる */
+      background: rgba(247, 246, 242, 0.32);
+      backdrop-filter: blur(1px);
+      -webkit-backdrop-filter: blur(1px);
       transition: opacity 1.4s ease, visibility 1.4s, backdrop-filter 1.4s ease;
     }
     .loader.is-hidden { backdrop-filter: blur(0px); -webkit-backdrop-filter: blur(0px); }
@@ -292,7 +294,7 @@
        白ハローを敷いて可読性を確保する */
     .loader__brand {
       font-size: 11px; letter-spacing: 0.4em; color: var(--ink-dim);
-      text-shadow: 0 0 6px #f7f6f2, 0 0 12px #f7f6f2;
+      text-shadow: 0 0 8px #f7f6f2, 0 0 16px #f7f6f2, 0 0 4px #f7f6f2;
     }
     /* 進捗の数値は情報としては残すが、詩コピーより手前に出ないよう
        ブランド行と同じ弱さに揃える（以前は --ink・13px で画面内の
@@ -300,13 +302,13 @@
     .loader__status {
       font-size: 9px; letter-spacing: 0.4em; color: var(--ink-dim);
       min-height: 1.4em;
-      text-shadow: 0 0 6px #f7f6f2, 0 0 12px #f7f6f2;
+      text-shadow: 0 0 8px #f7f6f2, 0 0 16px #f7f6f2, 0 0 4px #f7f6f2;
     }
     .loader__desc {
       font-family: var(--font-jp); font-size: 14px; letter-spacing: 0.18em;
       color: var(--ink-mid); text-align: center; line-height: 2.2; max-width: 34em;
       padding: 0 24px;
-      text-shadow: 0 0 6px #f7f6f2, 0 0 12px #f7f6f2, 0 0 3px #f7f6f2;
+      text-shadow: 0 0 8px #f7f6f2, 0 0 16px #f7f6f2, 0 0 4px #f7f6f2;
     }
     /* 文節ごとに区切り、区切りの間だけで折り返す。
        文節内で単語が割れると「旅に出ま／す。」のように演出ではなく
