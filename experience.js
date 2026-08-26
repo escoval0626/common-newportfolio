@@ -1950,6 +1950,13 @@ let fluff = null;
    見せる */
 buildWorldBase();
 buildHero();
+/* 旅の主役である綿毛ひとつ（makeFluff）も同じく手続き的な点描で、
+   GLBにもテクスチャにも依存しない。以前は「2エリア構築完了時点」まで
+   生成を遅らせていたため、ローディング中は肝心の綿毛が存在せず、
+   ヴェールの奥に浮いていなかった。タンポポと同時に、最初のフレームから
+   HERO_HEAD の位置に浮かせておく（updateFluff が毎フレーム息づかせる） */
+fluff = makeFluff();
+fluff.position.copy(HERO_HEAD);
 AREAS.forEach((ar) => { ar.currentW = 0; });
 
 /* 全読込→シーン構築 */
@@ -1971,8 +1978,8 @@ Promise.all(
     buildOrder[builtCount].build();
     builtCount++;
     if (builtCount === 2) {
-      fluff = makeFluff();
-      fluff.position.copy(HERO_HEAD);
+      /* 綿毛はローディング開始時点で既に生成・浮遊させてある（上記参照）。
+         ここではENTERの解禁だけを行う */
       sceneReady = true; /* パネル画像の非同期ロードはこの後 panelPending で待つ */
     }
     if (builtCount < buildOrder.length) setTimeout(buildNextArea, 180);
