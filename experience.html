@@ -95,6 +95,10 @@
     /* touch-action:none が無いと、Androidで下方向ドラッグがpull-to-refreshに
        吸われ、旅を戻そうとした操作でページごと再読込されることがある */
     canvas.xp-canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+    /* 霧のヴェール（.loader、z-index:100）より手前に重ね、綿毛だけを
+       霧の上に浮かせる。背景は透明（WebGLRenderer側でalpha:trueにして
+       クリア色を設定しない）にし、綿毛の点描以外は素通しにする */
+    .loader-fluff-canvas { z-index: 101; pointer-events: none; }
     .bg-video {
       position: fixed; inset: 0; z-index: 1;
       width: 100%; height: 100%;
@@ -279,17 +283,26 @@
        霧そのものに見せている */
     .loader {
       position: fixed; inset: 0; z-index: 100;
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      gap: 26px;
       /* 0.82は幕とほぼ同じ濃さで、背後の綿毛がほぼ見えなかった。
          綿毛が「ヴェールの手前にいる」と感じられる濃さまで大きく下げる */
       background: rgba(247, 246, 242, 0.32);
       backdrop-filter: blur(1px);
       -webkit-backdrop-filter: blur(1px);
+      pointer-events: none;
       transition: opacity 1.4s ease, visibility 1.4s, backdrop-filter 1.4s ease;
     }
     .loader.is-hidden { backdrop-filter: blur(0px); -webkit-backdrop-filter: blur(0px); }
     .loader.is-hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+    /* テキスト群。#loaderFluffCanvas（綿毛、z-index:101）より確実に
+       手前に出すため、ヴェールとは別のスタッキングコンテキストにする */
+    .loader-content {
+      position: fixed; inset: 0; z-index: 102;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 26px;
+      pointer-events: none; /* ENTERボタンだけ .loader__enter.is-ready で個別に有効化 */
+      transition: opacity 1.4s ease, visibility 1.4s;
+    }
+    .loader-content.is-hidden { opacity: 0; visibility: hidden; pointer-events: none; }
     /* 霧の奥にタンポポが像を結ぶため、文字は本編の詩コピーと同じく
        白ハローを敷いて可読性を確保する */
     .loader__brand {
@@ -810,6 +823,15 @@
 <body>
 
   <canvas class="xp-canvas" id="xpCanvas"></canvas>
+  <!-- 綿毛（旅の主役）だけを描く専用canvas。ローディング中は
+       「ローディングUI → 綿毛 → 霧のヴェール → タンポポ本体（xpCanvas）」
+       という重なり順にしたいが、1枚のcanvasに全部まとめて描いている限り、
+       手前のCSSヴェール（.loader）は綿毛ごと覆い隠してしまい、綿毛だけを
+       霧の手前に出すことができない。綿毛オブジェクトだけをこの透明な
+       別canvasに移してレンダリングし、.loaderより手前に重ねることで
+       実現する（タンポポ本体は元のxpCanvasに残したまま＝霧の奥でよい）。
+       ENTER後は綿毛を本編シーンへ戻し、このcanvasへの描画は止める -->
+  <canvas class="xp-canvas loader-fluff-canvas" id="loaderFluffCanvas"></canvas>
   <!-- 3D体験は視覚演出であって、作品そのものの唯一の窓口ではない。
        WebGLを解釈できない環境（スクリーンリーダー・検索エンジンのクローラー）
        向けに、同じ作品・キャプションを通常のHTMLとしてここに用意する。
@@ -894,7 +916,13 @@
        ENTERで霧が晴れてそのまま旅が始まる＝画面の切り替わりが存在しない。
        情景間の移動で使っている「霧が閉じ、着地で晴れる」のと同じ語彙で
        冒頭を通す -->
-  <div class="loader" id="loader">
+  <!-- 霧のヴェール（背景色＋ぼかしのみ）。テキスト群は別要素
+       （.loader-content、下記）に分離してある。理由は #loaderFluffCanvas
+       （綿毛、z-index:101）を「霧より手前・文字より奥」に置きたいが、
+       文字をこの.loader要素の子のままにするとスタッキングコンテキストが
+       .loaderのz-index:100に閉じ込められ、綿毛より手前に出せないため -->
+  <div class="loader" id="loader"></div>
+  <div class="loader-content" id="loaderContent">
     <p class="loader__brand">COMMON — EXPERIENCE</p>
     <p class="loader__status" id="loaderStatus">LOADING 0%</p>
     <p class="loader__desc"><span>一輪のタンポポから、</span><span>綿毛がひとつ旅に出ます。</span><br /><span>その行方を追って、</span><span>六つの風景を巡ってください。</span></p>

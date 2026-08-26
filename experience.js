@@ -73,6 +73,23 @@ try {
   throw e;
 }
 
+/* 綿毛（旅の主役）だけを、霧のヴェールより手前に描くための専用レンダラー。
+   ENTER前はこのシーンだけに綿毛を置いてレンダリングし、ENTER後は
+   本編のsceneへ戻す（下記 fluff = makeFluff() 付近、およびenterBtnの
+   クリックハンドラ参照）。失敗しても本編体験には影響させない
+   （綿毛が霧の奥のままになるだけで、機能的な破綻はない） */
+let loaderFluffRenderer = null;
+const loaderFluffScene = new THREE.Scene();
+try {
+  const loaderFluffCanvas = document.getElementById("loaderFluffCanvas");
+  if (loaderFluffCanvas) {
+    loaderFluffRenderer = new THREE.WebGLRenderer({
+      canvas: loaderFluffCanvas, alpha: true, antialias: true,
+    });
+    loaderFluffRenderer.setClearColor(0x000000, 0);
+  }
+} catch (e) { loaderFluffRenderer = null; }
+
 /* GPUドライバのクラッシュ・タブのバックグラウンド長時間放置・端末のメモリ逼迫等で
    コンテキストが失われると、以降renderer.render()は何も描かず沈黙する
    （エラーは出ない）。契機を捉えてループを止め、無音の黒画面のまま
@@ -1955,7 +1972,14 @@ buildHero();
    生成を遅らせていたため、ローディング中は肝心の綿毛が存在せず、
    ヴェールの奥に浮いていなかった。タンポポと同時に、最初のフレームから
    HERO_HEAD の位置に浮かせておく（updateFluff が毎フレーム息づかせる） */
-fluff = makeFluff();
+fluff = makeFluff(); /* 内部でscene.addされる */
+/* ENTER前は霧のヴェールより手前に見せたいので、本編sceneから
+   loaderFluffScene（別レンダラーで.loaderより上に重ねる専用シーン）へ
+   移す。ENTER時に本編sceneへ戻す（enterBtnのクリックハンドラ参照） */
+if (loaderFluffRenderer) {
+  scene.remove(fluff);
+  loaderFluffScene.add(fluff);
+}
 fluff.position.copy(HERO_HEAD);
 AREAS.forEach((ar) => { ar.currentW = 0; });
 
@@ -3777,6 +3801,7 @@ window.addEventListener("pointermove", (e) => {
    UI 配線
 ============================================================ */
 const loader = document.getElementById("loader");
+const loaderContent = document.getElementById("loaderContent");
 const loaderStatus = document.getElementById("loaderStatus");
 const enterBtn = document.getElementById("enterBtn");
 const hud = document.getElementById("hud");
@@ -3866,7 +3891,17 @@ const loadTick = setInterval(() => {
 
 enterBtn.addEventListener("click", () => {
   loader.classList.add("is-hidden");
+  loaderContent.classList.add("is-hidden");
   hud.classList.add("is-active");
+  /* 綿毛を専用シーンから本編sceneへ戻す。以後は通常どおりrenderer.render
+     （メインのxpCanvas）だけが綿毛を描き、loaderFluffCanvas側は
+     何も残っていないシーンをレンダリングし続けるだけになる
+     （空シーンのレンダリングは軽いので、animation loop側の分岐は
+     rig.enteredのタイミングに委ね、ここでは要素の移動だけ行う） */
+  if (loaderFluffRenderer && fluff) {
+    loaderFluffScene.remove(fluff);
+    scene.add(fluff);
+  }
   /* このクリックは window まで bubble し、そちらのレイキャストハンドラは
      rig.entered を見て発火を決めている。同じイベント内で同期的に true にすると、
      マクロショットの姿勢のまま同一クリックがレイキャストに流れ、
@@ -3998,6 +4033,10 @@ const BASE_FOV = 42, BASE_ASPECT = 16 / 9;
 function resize() {
   applyPixelRatio(); /* 窓の大きさが変われば塗る面積も変わるので、そのつど上限に収め直す */
   renderer.setSize(innerWidth, innerHeight, false);
+  if (loaderFluffRenderer) {
+    loaderFluffRenderer.setPixelRatio(renderer.getPixelRatio());
+    loaderFluffRenderer.setSize(innerWidth, innerHeight, false);
+  }
   camera.aspect = innerWidth / innerHeight;
   if (camera.aspect < BASE_ASPECT) {
     const k = Math.min(BASE_ASPECT / camera.aspect, 2.35);
@@ -4273,6 +4312,7 @@ if (TRAILER) {
 
   async function shoot() {
     loader.classList.add("is-hidden");
+    loaderContent.classList.add("is-hidden");
     hud.classList.remove("is-active");   /* HUDは合成側で描くので出さない */
     anchorsWrap.style.display = "none";
     if (heroTitle) heroTitle.style.display = "none";
@@ -4409,6 +4449,12 @@ renderer.setAnimationLoop(() => {
   updateRoom(dt);
   updateAnchors();
   renderer.render(scene, camera);
+  /* 綿毛（霧のヴェールより手前）はENTER前だけ描く。ENTER後はfluffを
+     本編sceneへ戻し済み（enterBtnのクリックハンドラ参照）なので、
+     こちらは空シーンのレンダリングになるが、以後は呼ぶ必要が無い */
+  if (!rig.entered && loaderFluffRenderer) {
+    loaderFluffRenderer.render(loaderFluffScene, camera);
+  }
 });
 
 /* CONTACT：近づくほど種から花が咲く（0→1へ成長、わずかに揺れる） */
