@@ -646,9 +646,20 @@
       .xp-copy__col { font-size: 19px; }
 
       /* ABOUTは日英2カラムだと数十px幅に潰れるので、縦積みに切り替える。
-         Practice分を削って情報量を減らし、フォントも詰めて、
-         スクロール無しで画面の高さに収まるようにする */
-      .xp-copy--about { width: 86vw; }
+         展示歴を削り情報量を減らし、フォントも詰めているが、それでも
+         端末によっては画面の高さに収まりきらないことがある。以前は
+         このケースの受け皿が無く、収まらない分がそのまま画面の外まで
+         伸び、3D空間に浮かぶ箱ではなく通常のページのように本文が
+         流れ落ちて見えていた（addAboutBox側でwheel/pointerdownの
+         伝播は既に止めてあり、内部スクロールにする前提で組んであった
+         のに、肝心のCSS側でスクロール領域を区切っていなかった）。
+         箱の高さに上限を設け、超えた分は箱の中だけでスクロールさせる */
+      .xp-copy--about {
+        width: 86vw;
+        max-height: 52vh;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+      }
       .xp-about__bio-row { flex-direction: column; }
       .xp-about__bio-en {
         margin-left: 0; padding-left: 0; border-left: 0;
