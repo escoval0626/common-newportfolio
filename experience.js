@@ -1756,10 +1756,16 @@ const AREAS = [
     gesture: { dy: 0.3, lookDy: 0.15 }, /* 展示室に足を踏み入れ、静かに全体を見渡す */
     hotspot: "View the series",
     lines: ["見せることは、", "選び、手放すこと。"],
-    /* 北郷さんの実写。題は1枚ずつ実物を見て付けている */
+    /* 北郷さんの実写。題は1枚ずつ実物を見て付けている。
+       3枠目（受賞歴）は、その作品が実際に選ばれた展示・コンテスト。
+       以前は詩コピー画面（addCopyBoxのxp-contact-extra）にまとめて
+       出していたが、モバイルではその画面自体が詩＋英訳＋展示歴2件で
+       縦に長くなりすぎ、下のホットスポットと文字が重なっていた。
+       作品ごとの受賞歴として、該当写真を開いた時（zoomCapText）に
+       出す形へ移す方が情報としても自然で、詩コピー画面もシンプルになる */
     photos: [
-      ["assets/photos/exhibitions/exhibitions-01.jpg", "Wrapped"],
-      ["assets/photos/exhibitions/exhibitions-02.jpg", "Tiny World"],
+      ["assets/photos/exhibitions/exhibitions-01.jpg", "Wrapped", "epSITE ONLINE PHOTO CONTEST 2023 入賞"],
+      ["assets/photos/exhibitions/exhibitions-02.jpg", "Tiny World", "BOKEHPHOTOFAN GROUP EXHIBITION 2024 出展"],
     ],
     /* コラージュ：水辺の情景（DSC_2786、縦長1024x1535→aspect 1.499）を単体で、大きく静かに見せる。
        粒子の"組み上がり"演出（dust）は近づいても常時うっすら残る仕様のため、
@@ -2353,26 +2359,12 @@ function addCopyBox(area) {
     extra.appendChild(leadEn);
     el.appendChild(extra);
   }
-  /* EXHIBITIONS：「見せる」というテーマの情景に、実際の展示歴を添える。
-     ABOUTにも同じ情報を置いているが、そちらまで辿り着かない訪問者にも
-     ここで実績が見えるようにする（CONTACTと同じ追加情報ブロックを流用） */
-  if (area.name === "EXHIBITIONS") {
-    const extra = document.createElement("div");
-    extra.className = "xp-contact-extra";
-    const headline = document.createElement("p");
-    headline.className = "xp-contact-extra__headline";
-    headline.textContent = "Exhibitions.";
-    extra.appendChild(headline);
-    const lead = document.createElement("p");
-    lead.className = "xp-contact-extra__lead";
-    lead.innerHTML = "BOKEHPHOTOFAN GROUP EXHIBITION 2024 出展。<br class=\"xp-contact-extra__br\">epSITE ONLINE PHOTO CONTEST 2023 入賞。";
-    extra.appendChild(lead);
-    const leadEn = document.createElement("p");
-    leadEn.className = "xp-contact-extra__lead-en";
-    leadEn.textContent = "Exhibited in BOKEHPHOTOFAN GROUP EXHIBITION 2024. Selected in epSITE ONLINE PHOTO CONTEST 2023.";
-    extra.appendChild(leadEn);
-    el.appendChild(extra);
-  }
+  /* EXHIBITIONSの展示歴は、以前はここ（詩コピー画面）にCONTACTと同じ
+     追加情報ブロックとしてまとめて添えていたが、詩＋英訳＋展示歴2件で
+     箱が縦に長くなり、モバイルでは下のホットスポットと文字が重なって
+     いた。実績は「その作品が実際に選ばれた」という個別の話なので、
+     詩コピー画面ではなく該当写真を開いた時（zoomCapText）に出す形へ
+     移した。ABOUTには引き続き一覧として残してある */
   anchorsWrap.appendChild(el);
   const dir = area.center.clone().sub(area.viewPos).normalize();
   const right = new THREE.Vector3().crossVectors(dir, UP).normalize();
@@ -2916,7 +2908,7 @@ function buildPlaceRoom(area) {
   const mats = [], meshes = [];
   /* このシリーズの写真だけを掛ける。他エリアと混ざると「見ているもの」が
      不明瞭になるため、部屋はカテゴリごとに独立させる */
-  const shots = (area.photos || []).map(([u, c]) => ({ u, c, ar: area }));
+  const shots = (area.photos || []).map(([u, c, award]) => ({ u, c, award, ar: area }));
   const startIdx = 0;
   const GAP = ROOM_GAP, PAD = ROOM_PAD;
   const yBase = GROUND_Y + 2.5;
@@ -2931,7 +2923,7 @@ function buildPlaceRoom(area) {
     m.rotation.y = faceY;
     m.userData = {
       idx: i, tex: null, url: s.u, loaded: false, loading: false,
-      cap: s.c, area: s.ar, baseY: yBase, w: ROW_H * 1.5, h: ROW_H,
+      cap: s.c, award: s.award, area: s.ar, baseY: yBase, w: ROW_H * 1.5, h: ROW_H,
     };
     room.add(m);
     meshes.push(m);
@@ -3043,11 +3035,16 @@ function zoomCapText(mesh, n, total) {
   const label = `${String(n + 1).padStart(2, "0")} / ${String(total).padStart(2, "0")}`;
   if (!zoomCap) return;
   const d = mesh.userData;
+  /* EXHIBITIONSの受賞歴は、以前は詩コピー画面にまとめて出していたが、
+     モバイルでは詩＋英訳＋展示歴2件で箱が縦に長くなりすぎ、下の
+     ホットスポットと文字が重なっていた。作品ごとの実績なので、
+     その写真を実際に開いた時（ここ）に出す方が自然かつ場所も足りる */
+  const meta = d.award ? `${d.area.name} · ${d.award}` : d.area.name;
   zoomCap.querySelector(".zoom-cap__num span").textContent = label;
   zoomCap.querySelector(".zoom-cap__title span").textContent = String(d.cap || "");
-  zoomCap.querySelector(".zoom-cap__meta span").textContent = d.area.name;
+  zoomCap.querySelector(".zoom-cap__meta span").textContent = meta;
   const live = document.getElementById("zoomLive");
-  if (live) live.textContent = `${d.area.name}、${n + 1} / ${total}、${d.cap || ""}`;
+  if (live) live.textContent = `${d.area.name}、${n + 1} / ${total}、${d.cap || ""}${d.award ? "、" + d.award : ""}`;
 }
 
 /* 動いている最中の1枚は、毎フレームの姿勢計算から外す。
