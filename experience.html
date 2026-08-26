@@ -283,11 +283,15 @@
        霧そのものに見せている */
     .loader {
       position: fixed; inset: 0; z-index: 100;
-      /* 0.82は幕とほぼ同じ濃さで、背後の綿毛がほぼ見えなかった。
-         綿毛が「ヴェールの手前にいる」と感じられる濃さまで大きく下げる */
-      background: rgba(247, 246, 242, 0.32);
-      backdrop-filter: blur(1px);
-      -webkit-backdrop-filter: blur(1px);
+      /* 0.32まで下げたのは、その時点では綿毛もこのヴェールの"奥"に
+         あったため（＝ヴェールを薄くしないと綿毛ごと見えなくなっていた）。
+         今は綿毛を#loaderFluffCanvas（ヴェールより手前、z-index:101）に
+         分離済みなので、ヴェールはタンポポ本体（xpCanvas側、まだ奥にある）
+         だけを隠せばよく、遠慮なく濃くできる。0.32だと逆にタンポポの
+         220本の毛の頭花がくっきり透けて見えてしまっていた */
+      background: rgba(247, 246, 242, 0.86);
+      backdrop-filter: blur(3px);
+      -webkit-backdrop-filter: blur(3px);
       pointer-events: none;
       transition: opacity 1.4s ease, visibility 1.4s, backdrop-filter 1.4s ease;
     }
