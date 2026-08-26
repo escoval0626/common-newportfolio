@@ -2380,7 +2380,17 @@ function addCopyBox(area) {
     .addScaledVector(dir, -0.8)
     .addScaledVector(right, -1.5);
   p.y = 2.0;
-  domAnchors.push({ el, pos: p, area, beatT: null, clamp: true });
+  domAnchors.push({
+    el, pos: p, area, beatT: null, clamp: true,
+    /* デフォルトのclampRect（y1:0.72）は、ホットスポット側の帯（y0:0.72、
+       CONTACTはy0:0.82）とちょうど隙間ゼロで接しており、実測高さ（baseH）が
+       クランプ計算の想定よりわずかでも大きいと即座に食い込んで文字が重なる。
+       Webフォントはdisplay=swapで読み込んでおり、確定前のフォールバック
+       フォントで採寸されると縦組み日本語の実際の高さとズレが出やすい
+       （フォント確定後に測り直す対策は別途入れたが、それでも余白ゼロは
+       壊れやすいため、モバイルでは確実な余白を持たせておく） */
+    clampRect: MOBILE_LAYOUT ? { x0: 0.1, x1: 0.7, y0: 0.12, y1: 0.60 } : undefined,
+  });
 }
 
 /* ABOUT：自己紹介カット（見出し＋名前・肩書＋長文バイオ(日英)＋展示歴を1つの箱に） */
@@ -2523,6 +2533,20 @@ AREAS.forEach((area) => {
   anchorsWrap.appendChild(el);
   domAnchors.push({ el, pos: OPENING_COPY.pos.clone(), area: null, beatT: OPENING_COPY.t, clamp: true, sharp: true });
 })();
+
+/* Google Fontsはdisplay=swapで読み込んでおり、フォント確定前は一瞬フォールバック
+   フォント（游ゴシック/Georgia等）で描画される。updateAnchors側のmeasureAnchor()は
+   「一度measureしたら再測しない」作りのため、そのフォールバック時点の寸法が
+   baseW/baseHとして固定されてしまい、実際のWebフォントに差し替わった後の
+   本当の高さ（特に縦組み日本語は書体でかなり変わる）とズレる。
+   結果、CONTACT/ABSTRACTS等コンテンツ量の多い箱で、クランプ計算が実際より
+   低い高さを前提に行われ、下端がホットスポットの帯まで食い込んで文字が
+   重なって見えていた。フォント確定後に一度だけ測り直す */
+if (document.fonts && document.fonts.ready) {
+  document.fonts.ready.then(() => {
+    domAnchors.forEach((a) => { a.baseW = 0; a.baseH = 0; });
+  });
+}
 
 /* 谷の詩は3D投影しない（絵に紐づかず、霧そのものの中に漂う言葉なので画面固定） */
 VALLEY_LINES.forEach((v) => {
