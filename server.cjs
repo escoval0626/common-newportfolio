@@ -37,7 +37,10 @@ http
     } catch {
       urlPath = req.url.split("?")[0];
     }
-    if (urlPath === "/") urlPath = "/index.html";
+    /* 本番(vercel.json)は / を /experience.html にリライトしている。
+       ここで /index.html を返していると、ローカルだけ旧TOP（.gitignore済みで
+       本番には存在しないファイル）が開き、確認結果が本番と食い違う */
+    if (urlPath === "/") urlPath = "/experience.html";
 
     /* トレーラーのコマ受け取り（ブラウザからは書き出せないので、ここで受けて保存する） */
     if (req.method === "POST" && urlPath.startsWith("/frame/")) {

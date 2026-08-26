@@ -589,17 +589,39 @@
       color: #6a655c; margin-top: 2px;
       text-shadow: 0 0 5px #f4f1ea, 0 0 10px #f4f1ea;
     }
-    /* ===== WebGL非対応・コンテキスト喪失時のフォールバック ===== */
+    /* ===== WebGL非対応・コンテキスト喪失時のフォールバック =====
+       以前は「表示に問題が発生しました」というエラー文言＋問い合わせ
+       リンクのみで、WebGLが使えない訪問者には作品が一切見せられて
+       いなかった（審査・閲覧環境によってはWebGL自体を制限している
+       ことがある）。作品6点＋プロフィール＋連絡先を静的に見せる
+       「代替体験」として作り込む */
     .webgl-fallback {
       position: fixed; inset: 0; z-index: 999;
-      display: none; flex-direction: column; align-items: center; justify-content: center;
-      gap: 18px; padding: 24px; text-align: center; background: var(--bg);
+      display: none; flex-direction: column; align-items: center;
+      gap: 22px; padding: 56px 24px; text-align: center; background: var(--bg);
+      overflow-y: auto; -webkit-overflow-scrolling: touch;
     }
     .webgl-fallback.is-active { display: flex; }
     .webgl-fallback__brand { font-size: 11px; letter-spacing: 0.4em; color: var(--ink-dim); }
     .webgl-fallback__msg {
       font-family: var(--font-jp); font-size: 14px; line-height: 1.9;
       max-width: 32em; color: var(--ink-mid);
+    }
+    .webgl-fallback__grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 14px; width: 100%; max-width: 920px; margin: 4px 0;
+    }
+    .webgl-fallback__grid figure { margin: 0; }
+    .webgl-fallback__grid img {
+      width: 100%; height: 190px; object-fit: cover; display: block;
+    }
+    .webgl-fallback__grid figcaption {
+      margin-top: 6px; font-size: 10px; letter-spacing: 0.1em; color: var(--ink-dim);
+      text-align: left;
+    }
+    .webgl-fallback__bio {
+      font-family: var(--font-jp); font-size: 13px; line-height: 1.9;
+      max-width: 34em; color: var(--ink-mid); text-align: left;
     }
     .webgl-fallback__link {
       font-size: 12px; letter-spacing: 0.12em; color: var(--ink);
@@ -773,7 +795,34 @@
        (showWebglFallback)で表示状態と同期させる -->
   <div class="webgl-fallback" id="webglFallback" role="alert" aria-hidden="true">
     <p class="webgl-fallback__brand">COMMON — EXPERIENCE</p>
-    <p class="webgl-fallback__msg">この体験の表示に問題が発生しました。<br />ページの再読み込み、またはブラウザの更新をお試しください。</p>
+    <p class="webgl-fallback__msg">お使いの環境では3D体験を表示できませんでした。<br />作品と概要をこちらに簡易表示しています。</p>
+    <div class="webgl-fallback__grid">
+      <figure>
+        <img src="assets/photos/plants/thumb/plants-01.jpg" alt="White Yarrow, Meadow" loading="lazy" />
+        <figcaption>PLANTS — White Yarrow, Meadow</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/photos/landscapes/thumb/landscapes-01.jpg" alt="Autumn Pond, Morning Mist" loading="lazy" />
+        <figcaption>LANDSCAPES — Autumn Pond, Morning Mist</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/photos/architectures/thumb/architectures-01.jpg" alt="Café Window, Green Beyond" loading="lazy" />
+        <figcaption>ARCHITECTURES — Café Window, Green Beyond</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/photos/snaps/thumb/snaps-01.jpg" alt="Gull Over Surf" loading="lazy" />
+        <figcaption>SNAPS — Gull Over Surf</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/photos/abstracts/thumb/abstracts-01.jpg" alt="Vertical Blur" loading="lazy" />
+        <figcaption>ABSTRACTS — Vertical Blur</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/photos/exhibitions/thumb/exhibitions-01.jpg" alt="Wrapped" loading="lazy" />
+        <figcaption>EXHIBITIONS — Wrapped</figcaption>
+      </figure>
+    </div>
+    <p class="webgl-fallback__bio">COMMON は、北郷 将による写真プロジェクト。千葉県流山市を拠点に、日常の中でふと立ち止まりたくなるような光や余白、ざらついた静けさを記録しています。オールドレンズを通して、都市と生活のすきまにある見過ごされがちな瞬間を抽象的にすくい取ろうとしています。</p>
     <a class="webgl-fallback__link" id="webglFallbackLink" href="mailto:escoval0626@gmail.com">お問い合わせ — escoval0626@gmail.com</a>
   </div>
   <!-- ミニマルなループ動画（霧の揺らぎを乗算で薄く重ねる・試験導入）。

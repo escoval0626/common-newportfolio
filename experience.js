@@ -21,8 +21,11 @@ const canvas = document.getElementById("xpCanvas");
 
 /* WebGL自体が使えない環境（古いブラウザ・一部の組み込みWebView・GPU拒否リスト）
    ではWebGLRenderingContextのコンストラクタが例外を投げる。この体験は
-   WebGL前提で全編組んであり縮退動作を用意できないため、非対応時はフォールバック
-   文言を出し、index.html（静的な写真ポートフォリオ）へ逃がす */
+   WebGL前提で全編組んであり縮退動作を用意できないため、非対応時は
+   #webglFallback（作品6点＋プロフィール＋連絡先の静的な代替表示）に切り替える。
+   以前はここから index.html へ逃がす想定だったが、その旧TOPは公開対象から
+   外してある（.gitignore済み・本番には存在しない）ので、逃がし先を持たず
+   このページ内で完結させる */
 function isWebGLAvailable() {
   try {
     const c = document.createElement("canvas");
@@ -4372,11 +4375,15 @@ renderer.setAnimationLoop(() => {
     const { capArea, capW } = updateCamera(dt);
     updateHud(capArea, capW);
   } else {
-    /* マクロショット：わずかに息づく手持ちカメラ */
+    /* マクロショット：わずかに息づく手持ちカメラ。
+       着地後の呼吸（updateCamera内）はREDUCE_MOTIONで振幅0にしているのに、
+       ENTER前のこの区間だけ揺れが素通りしていた。前庭系に敏感な訪問者が
+       最初に触れる瞬間なので、同じ基準で振幅を0にする */
+    const macroAmp = REDUCE_MOTION ? 0 : 1;
     camera.position.set(
-      0.12 + Math.sin(t * 0.4) * 0.05,
-      1.52 + Math.sin(t * 0.55) * 0.03,
-      4.7 + Math.cos(t * 0.3) * 0.05
+      0.12 + Math.sin(t * 0.4) * 0.05 * macroAmp,
+      1.52 + Math.sin(t * 0.55) * 0.03 * macroAmp,
+      4.7 + Math.cos(t * 0.3) * 0.05 * macroAmp
     );
     camera.lookAt(HERO_HEAD);
   }
