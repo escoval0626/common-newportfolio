@@ -2252,7 +2252,20 @@ function updateCamera(dt) {
      生成コストがその1フレームに乗って詰まり、次のdtが膨らんでカメラが
      一気に動いて見えていた（部屋に入る瞬間のカクつきの原因） */
   if (capArea && capW > 0.25 && capArea.photos && !capArea._room) {
-    buildPlaceRoom(capArea);
+    const preRoom = buildPlaceRoom(capArea);
+    /* 部屋の躯体は先に組んでおいても、正面付近の写真の実体化
+       （ensureRoomTexture＝テクスチャの実ロード）は updateRoom(dt) の
+       ウィンドウ判定に任せていた。だが updateRoom は activeRoom が
+       設定された後（＝実際にopenGalleryのタイムラインが完了した後）
+       にしか動かないため、「先に組んでおく」の恩恵が実質ゼロだった。
+       正面（startIdx）付近だけ、この時点で先にロードを始めておく。
+       これが無いと、部屋を開いた瞬間はまだ全メッシュが仮の縦横比
+       （1.5固定）の白い板のままで、実サイズが判ってから一気に
+       縦長へ組み直り、その様子がガタつきとして見えていた */
+    const win = Math.ceil(ROOM_WINDOW_RADIUS / (ROW_H * 1.5 + ROOM_GAP));
+    for (let i = Math.max(0, preRoom.startIdx - win); i <= preRoom.startIdx + win; i++) {
+      if (preRoom.meshes[i]) ensureRoomTexture(preRoom.meshes[i]);
+    }
   }
   /* ヒーロータイトル：冒頭で表示、スクロールで退場（progress 0.01→0.06 で消える） */
   if (heroTitle) {
@@ -3031,8 +3044,22 @@ function buildPlaceRoom(area) {
     positions = [];
     for (const m of meshes) {
       const cx2 = cur + m.userData.w / 2;
-      m.position.copy(area.center).addScaledVector(dir, 9.5).addScaledVector(right, cx2);
-      m.position.y = yBase;
+      const targetPos = area.center.clone().addScaledVector(dir, 9.5).addScaledVector(right, cx2);
+      targetPos.y = yBase;
+      /* 初回配置（まだ画面に見えていない組み立て中）はジャンプで問題ないが、
+         2回目以降（写真の読み込みが進んで実サイズが判明するたびに呼ばれる）
+         は、事前の先読み（updateCamera側）で大半は防げるものの、それでも
+         間に合わなかった写真では位置が変わる。ここは滑らかな移動にして、
+         万一のズレを「整列し直す」動きに見せる（ジャンプに見せない） */
+      if (m.userData.laidOut) {
+        gsap.to(m.position, {
+          x: targetPos.x, y: targetPos.y, z: targetPos.z,
+          duration: 0.4, ease: "power2.out",
+        });
+      } else {
+        m.position.copy(targetPos);
+        m.userData.laidOut = true;
+      }
       m.userData.centerOff = cx2;
       positions.push(cx2);
       cur += m.userData.w + GAP;
@@ -3590,8 +3617,14 @@ function openGallery(area) {
     },
   });
   tl.to(rig, { detour: 1, duration: 1.9, ease: "power2.inOut" }, 0)
-    /* 濃度はシェーダー側の uOpacity が持つ（マテリアルの opacity では効かない） */
-    .to(room.mats.map((m) => m.uniforms.uOpacity),
+    /* 濃度はシェーダー側の uOpacity が持つ（マテリアルの opacity では効かない）。
+       room.mats全体を一律にフェードインすると、まだ画像が読み込まれて
+       いない板（仮の縦横比1.5のまま、白い横長のプレースホルダー）まで
+       ここで見えるようになってしまい、その直後に実サイズへ組み直って
+       ガタつく。既に読み込み済みの板だけをここでフェードインし、
+       未読み込みの板は個別のensureRoomTexture完了時（既存のコールバック）
+       に、実サイズが確定した状態でフェードインさせる */
+    .to(room.meshes.filter((m) => m.userData.loaded).map((m) => m.material.uniforms.uOpacity),
       { value: 0.98, duration: 1.1, stagger: 0.06, ease: "power2.out" }, 0.5)
     .to(anchorsWrap, { opacity: 0, duration: 0.5 }, 0)
     .to(mine.map((a) => a.mat), { opacity: 0, duration: 0.7, ease: "power2.out" }, 0);
