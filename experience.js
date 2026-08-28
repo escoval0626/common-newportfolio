@@ -3979,12 +3979,23 @@ if (hudContact) {
   });
 }
 
+/* 実読み込みが速い（キャッシュ済み・高速回線）と、1文字ずつ像を結ぶ
+   演出が再生しきる前にほぼ同時に全文字が現れてしまい、体験が回線状況
+   次第で毎回変わってしまう。表示用の進捗は「実進捗」と「経過時間から
+   逆算した進捗」の遅い方を採用し、最低でもMIN_LOAD_MSはかけて
+   100%に到達するようにする（実際に読み込みが遅い場合はそのまま伸びる） */
+const loadStartTime = performance.now();
+const MIN_LOAD_MS = 1200;
+
 const loadTick = setInterval(() => {
-  const real = Math.round((loadedCount / totalCount) * 100);
-  loaderStatus.textContent = `LOADING ${real}%`;
+  const realPct = Math.round((loadedCount / totalCount) * 100);
+  const elapsed = performance.now() - loadStartTime;
+  const timePct = Math.min(100, Math.round((elapsed / MIN_LOAD_MS) * 100));
+  const shown = Math.min(realPct, timePct);
+  loaderStatus.textContent = `LOADING ${shown}%`;
   /* 円環の代わりに、COMMON／タグラインの文字が進捗に応じて
      1文字ずつ霧の中から像を結んでいく */
-  const p = real / 100;
+  const p = shown / 100;
   revealChars(brandChars, p);
   revealChars(taglineChars, p);
   /* 以前は全パネル画像（写真・コラージュ、200枚以上）を含む panelPending===0 まで
@@ -3992,7 +4003,7 @@ const loadTick = setInterval(() => {
      3D空間の構造（モデル＋配置）さえ整えば旅は始められ、写真は各情景に
      近づく間にバックグラウンドで届いて距離ベースのopacityでフェードインする
      （updateArtworksが元々そう作られている）ので、待たずに入って問題ない */
-  if (loadedCount >= totalCount && sceneReady) {
+  if (loadedCount >= totalCount && sceneReady && elapsed >= MIN_LOAD_MS) {
     clearInterval(loadTick);
     loaderStatus.textContent = "READY";
     revealChars(brandChars, 1);
@@ -4003,17 +4014,24 @@ const loadTick = setInterval(() => {
        意味的にもdisabledにしておく */
     enterBtn.disabled = false;
     /* 「READY」と「ENTER」が画面に同時に残ると、同じ意味の情報が
-       重複して見える。READYは完了の合図として一瞬だけ見せたら、
-       ENTERの出現と入れ替わりに静かに退場させる */
-    gsap.to(loaderStatus, { opacity: 0, duration: 1, delay: 0.2, ease: "power2.out" });
+       重複して見える。以前はREADYのフェードアウト完了(1.2s)から
+       ENTERのフェードイン完了(2.55s)までの間に約1.35秒の「どちらも
+       主張していない空白」が生じていた。両方の所要時間を大きく縮め、
+       ほぼ重なるタイミングで入れ替える */
+    gsap.to(loaderStatus, { opacity: 0, duration: 0.6, ease: "power2.out" });
     /* ENTERの文字は、COMMON／タグラインと同じく縮小状態から
        フェード＋ズームインで静かに浮かび上がる（CSSのtransitionでは
-       なくGSAPで制御し、進捗の締まりと呼応する余韻の長いイージングを
-       つける） */
+       なくGSAPで制御する） */
     if (enterLabel) {
       gsap.to(enterLabel, {
         opacity: 1, scale: 1,
-        duration: 2.2, delay: 0.35, ease: "power3.out",
+        duration: 0.9, delay: 0.1, ease: "power2.out",
+        onComplete: () => {
+          /* 下線が伸びきった直後、ラベル全体を一度だけ小さく上下させる。
+             常時ループさせるとうるさいので1回のみ＝「ここが動く＝
+             触れる場所」だと能動的に知らせるための単発モーション */
+          gsap.to(enterLabel, { y: -3, duration: 0.32, ease: "power1.inOut", yoyo: true, repeat: 1, delay: 0.15 });
+        },
       });
     }
   }

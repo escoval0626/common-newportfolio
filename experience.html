@@ -308,17 +308,26 @@
     }
     .loader-content.is-hidden { opacity: 0; visibility: hidden; pointer-events: none; }
     /* 霧の奥にタンポポが像を結ぶため、文字は本編の詩コピーと同じく
-       白ハローを敷いて可読性を確保する */
+       白ハローを敷いて可読性を確保する。
+       以前はJosefin Sans・全大文字・letter-spacing 0.4emという、
+       本編のヒーロー見出し（Cormorant Garamond・斜体・102px）とは
+       別ブランドに見える書体だった。訪問者が最初の数秒に見る"顔"が
+       本編と一致するよう、ヒーロー見出しと同じ書体・字間に揃える */
     .loader__brand {
-      font-family: var(--font-latin); font-size: 18px; letter-spacing: 0.4em; color: var(--ink);
+      font-family: var(--font-display); font-style: italic; font-weight: 300;
+      font-size: clamp(38px, 6.5vw, 60px); letter-spacing: 0.02em; color: var(--ink);
       text-shadow: 0 0 8px #f7f6f2, 0 0 16px #f7f6f2, 0 0 4px #f7f6f2;
+    }
+    .loader__brand sup {
+      font-family: var(--font-latin); font-style: normal; font-size: 0.32em;
+      letter-spacing: 0.1em; vertical-align: super;
     }
     /* JOURNEY＝綿毛の旅＝人生＝撮り溜めてきた写真、という比喩を一行に
        乗せるタグライン。BACK TO JOURNEY・CONTACT終端コピーと語彙を揃え、
        ここで初めて「写真のポートフォリオである」ことを明示する */
     .loader__tagline {
       font-family: var(--font-latin); font-size: 12px; letter-spacing: 0.32em; color: var(--ink-dim);
-      margin-top: -10px;
+      margin-top: 2px;
       text-shadow: 0 0 8px #f7f6f2, 0 0 16px #f7f6f2, 0 0 4px #f7f6f2;
     }
     /* COMMON／タグラインの各文字（JS側でspanに分割）。進捗が該当文字の
@@ -339,8 +348,10 @@
       min-height: 1.4em;
       text-shadow: 0 0 8px #f7f6f2, 0 0 16px #f7f6f2, 0 0 4px #f7f6f2;
     }
-    /* ENTER＝タイポグラフィのみ。円環・数値でなく、COMMON／タグラインと
-       同じ「縮小状態からフェード＋ズームイン」で静かに浮かび上がる */
+    /* ENTER＝タイポグラフィのみ。ただし装飾テキスト（COMMON／タグライン）
+       と同じ視覚文法のままだと、どれが押せるボタンなのか区別がつかない。
+       サイズ・ウェイトを一段強くし、is-ready到達時にだけ専用の下線を
+       引くことで「これはCTAだ」というシグナルを独立して持たせる */
     .loader__enter {
       position: relative;
       margin-top: 8px;
@@ -355,10 +366,21 @@
        開始状態（縮んで透明な状態）だけを定義する */
     .loader__enter-label {
       display: inline-block;
-      font-family: var(--font-latin); font-size: 16px; letter-spacing: 0.32em; color: var(--ink);
+      position: relative;
+      font-family: var(--font-latin); font-weight: 500; font-size: 21px; letter-spacing: 0.34em; color: var(--ink);
       opacity: 0;
       transform: scale(0.72);
     }
+    /* CTA専用の下線。装飾テキストには一切付与しない。is-readyになった
+       瞬間だけ左から右へ伸び、「ここが動く＝触れる場所」だと知らせる */
+    .loader__enter-label::after {
+      content: "";
+      position: absolute; left: 0; right: 0; bottom: -6px;
+      height: 1px; background: var(--ink);
+      transform: scaleX(0); transform-origin: left;
+      transition: transform 0.7s ease-out;
+    }
+    .loader__enter.is-ready .loader__enter-label::after { transform: scaleX(1); }
     .loader__enter:hover .loader__enter-label { letter-spacing: 0.4em; }
 
     /* ===== HUD ===== */
@@ -958,7 +980,7 @@
        .loaderのz-index:100に閉じ込められ、綿毛より手前に出せないため -->
   <div class="loader" id="loader"></div>
   <div class="loader-content" id="loaderContent">
-    <p class="loader__brand"><span id="loaderBrandWord">COMMON</span><sup class="loader__char" id="loaderBrandMark">©</sup></p>
+    <p class="loader__brand"><span id="loaderBrandWord">Common</span><sup class="loader__char" id="loaderBrandMark">©</sup></p>
     <p class="loader__tagline" id="loaderTagline">A PHOTOGRAPHIC JOURNEY</p>
     <!-- 進捗は「LOADING 42%」という文字だけで見せていたが、画面内で
          いちばん強い情報量なのに素っ気なく、進捗そのものの手触りが
