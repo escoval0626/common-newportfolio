@@ -338,7 +338,11 @@
     .loader__char {
       display: inline-block;
       opacity: 0;
-      transform: scale(0.72);
+      /* 0.72→1では16px前後の文字でピクセル差が4〜5pxしかなく、
+         「ズームイン」のつもりが実質ただの長いフェードにしか見えない
+         というADレビューの指摘を受け、起点をさらに縮めて変化量そのもの
+         を知覚できる大きさにした */
+      transform: scale(0.5);
     }
     /* 進捗の数値は情報としては残すが、タグラインより手前に出ないよう
        ブランド行と同じ弱さに揃える（以前は --ink・13px で画面内の
@@ -369,16 +373,18 @@
       position: relative;
       font-family: var(--font-latin); font-weight: 500; font-size: 21px; letter-spacing: 0.34em; color: var(--ink);
       opacity: 0;
-      transform: scale(0.72);
+      transform: scale(0.5);
     }
     /* CTA専用の下線。装飾テキストには一切付与しない。is-readyになった
-       瞬間だけ左から右へ伸び、「ここが動く＝触れる場所」だと知らせる */
+       瞬間だけ左から右へ伸び、「ここが動く＝触れる場所」だと知らせる。
+       ラベル本体（GSAP側でdelay:0.1sから浮かび上がる）より下線が
+       0.1s早く動き出していたズレを、同じdelayを与えて揃えた */
     .loader__enter-label::after {
       content: "";
       position: absolute; left: 0; right: 0; bottom: -6px;
       height: 1px; background: var(--ink);
       transform: scaleX(0); transform-origin: left;
-      transition: transform 0.7s ease-out;
+      transition: transform 0.7s ease-out 0.1s;
     }
     .loader__enter.is-ready .loader__enter-label::after { transform: scaleX(1); }
     .loader__enter:hover .loader__enter-label { letter-spacing: 0.4em; }
@@ -981,7 +987,7 @@
   <div class="loader" id="loader"></div>
   <div class="loader-content" id="loaderContent">
     <p class="loader__brand"><span id="loaderBrandWord">Common</span><sup class="loader__char" id="loaderBrandMark">©</sup></p>
-    <p class="loader__tagline" id="loaderTagline">A PHOTOGRAPHIC JOURNEY</p>
+    <p class="loader__tagline" id="loaderTagline">ONE SEED, MANY JOURNEYS</p>
     <!-- 進捗は「LOADING 42%」という文字だけで見せていたが、画面内で
          いちばん強い情報量なのに素っ気なく、進捗そのものの手触りが
          無かった。円環（＝タンポポの頭花・綿毛の丸みと呼応する形）を
@@ -991,7 +997,7 @@
     <button class="loader__enter" id="enterBtn" disabled>
       <span class="loader__enter-label" id="enterLabel">ENTER</span>
     </button>
-    <p class="loader__status" id="loaderStatus">LOADING 0%</p>
+    <p class="loader__status" id="loaderStatus" aria-live="polite">LOADING 0%</p>
   </div>
 
   <!-- ロゴ／ドットナビ／CONTACTでの瞬間移動用フェードヴェール -->

@@ -2321,6 +2321,9 @@ function updateCamera(dt) {
 }
 
 /* 綿毛：カメラの少し先を、風に揺れながら先導する */
+/* READY到達の瞬間だけ綿毛が一度大きく揺れる、その基準時刻。
+   -1は「まだ起きていない」を表す（loadTick側で発火させる） */
+let fluffBurstAt = -1;
 function updateFluff(t, dt) {
   if (!fluff) return;
   if (!rig.entered) {
@@ -2330,12 +2333,21 @@ function updateFluff(t, dt) {
        視認性を損なう一方、+1.1/+0.85まで離すと今度は画面の隅に寄り
        すぎて存在感が薄れてしまった。テキスト塊とは重ならず、かつ
        画面内に留まる中間の位置へ */
+    /* READY到達＝文字が像を結び始める瞬間に、綿毛も一度だけ大きく
+       揺れて呼応する。「旅の起点（綿毛）が合図を送り、COMMON／
+       ENTERの文字が浮かび上がる」という因果関係を持たせるための
+       演出。1.1秒で減衰しきる一過性の揺れで、常時ループはしない */
+    let burst = 0;
+    if (fluffBurstAt >= 0) {
+      const el = (performance.now() - fluffBurstAt) / 1000;
+      if (el < 1.1) burst = Math.sin(el * Math.PI * 1.6) * Math.max(0, 1 - el / 1.1);
+    }
     fluff.position.set(
-      HERO_HEAD.x + 0.72 + Math.sin(t * 1.3) * 0.02,
-      HERO_HEAD.y + 0.5 + Math.sin(t * 1.7) * 0.02,
+      HERO_HEAD.x + 0.72 + Math.sin(t * 1.3) * 0.02 + burst * 0.13,
+      HERO_HEAD.y + 0.5 + Math.sin(t * 1.7) * 0.02 + burst * 0.08,
       HERO_HEAD.z + Math.cos(t * 1.1) * 0.02
     );
-    fluff.rotation.z = Math.sin(t * 0.9) * 0.1;
+    fluff.rotation.z = Math.sin(t * 0.9) * 0.1 + burst * 0.35;
     return;
   }
   const lead = THREE.MathUtils.clamp(rig.progress + 0.035, 0, 1);
@@ -4023,6 +4035,9 @@ const loadTick = setInterval(() => {
     loaderStatus.textContent = "READY";
     revealChars(brandChars, 1);
     revealChars(taglineChars, 1);
+    /* 綿毛が一度だけ大きく揺れる合図（updateFluff参照）。
+       「旅の起点が呼びかけ、文字が浮かび上がる」という因果関係にする */
+    fluffBurstAt = performance.now();
     enterBtn.classList.add("is-ready");
     /* opacity/pointer-eventsだけの制御だと、支援技術やフォーム送信は
        「押せるボタン」として扱ってしまう。実際に押せるようになるまでは
