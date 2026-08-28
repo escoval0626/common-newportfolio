@@ -19,6 +19,19 @@ import gsap from "gsap";
 
 const canvas = document.getElementById("xpCanvas");
 
+/* ?perf=1 のときだけ、重い処理の所要時間を window.__perf に溜める。
+   「どこがメインスレッドを止めているのか」を推測ではなく実測するための
+   計測フック。本番では条件が偽なので関数呼び出し1回ぶんしか掛からない */
+const PERF = /[?&]perf=1\b/.test(location.search);
+if (PERF) window.__perf = [];
+function perf(name, fn) {
+  if (!PERF) return fn();
+  const t0 = performance.now();
+  const r = fn();
+  window.__perf.push({ name, ms: +(performance.now() - t0).toFixed(1) });
+  return r;
+}
+
 /* WebGL自体が使えない環境（古いブラウザ・一部の組み込みWebView・GPU拒否リスト）
    ではWebGLRenderingContextのコンストラクタが例外を投げる。この体験は
    WebGL前提で全編組んであり縮退動作を用意できないため、非対応時は
@@ -536,9 +549,25 @@ function addWash(x, y, z, size, color, opacity = 0.34, aspect = 0.75) {
   return sp;
 }
 
+/* MeshSurfaceSampler.build() は三角形ごとの面積の累積分布を作る処理で、
+   モデルが複雑なほど重い（deadtree 1体で実測131ms）。TRANSIT_OBJECTS は
+   同じGLTFを deadtree 13体・fern 5体ぶん並べており、clone してもジオメトリ
+   自体は共有されるため、配置のたびに作り直すのは丸ごと無駄だった。
+   サンプラーは sample() で内部状態を持たない（毎回ランダムな点を返す）ので、
+   ジオメトリ単位で安全に使い回せる。ここが「最長1.7秒のブロック」の実体 */
+const surfaceSamplerCache = new WeakMap();
+function getSurfaceSampler(mesh) {
+  let s = surfaceSamplerCache.get(mesh.geometry);
+  if (!s) {
+    s = new MeshSurfaceSampler(mesh).build();
+    surfaceSamplerCache.set(mesh.geometry, s);
+  }
+  return s;
+}
+
 function sampleGeometryInto(a, geom, count, palette, transform, sizeMin = 0.5, sizeMax = 1.2, dim = 1) {
   const mesh = new THREE.Mesh(geom);
-  const sampler = new MeshSurfaceSampler(mesh).build();
+  const sampler = getSurfaceSampler(mesh);
   for (let k = 0; k < count; k++) {
     sampler.sample(_sp, _sn);
     if (transform) {
@@ -675,7 +704,7 @@ function getDustWorker() {
 
 /* 受け取った粒子データからThree.jsのオブジェクトを組む。
    WebGLコンテキストはメインスレッドにあるので、ここだけは移せない */
-function applyDust(rec, group, d) {
+function applyDust(rec, group, d) { perf("applyDust", () => {
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.BufferAttribute(d.pos, 3));
   geo.setAttribute("aScatter", new THREE.BufferAttribute(d.scat, 3));
@@ -695,7 +724,7 @@ function applyDust(rec, group, d) {
   group.add(pts);
   rec.dustMat = mat;
   rec.dustGeo = geo;
-}
+}); }
 
 /* 従来のメインスレッド版。ワーカーが使えない環境向けのフォールバックで、
    アルゴリズムは dust-worker.js 側と完全に同じ（見た目を変えないため） */
@@ -1093,7 +1122,7 @@ function placeScan(key, x, z, height, count, rotY = 0, opts = {}) {
   const a = makeAttrArrays(count * (mirror ? 2 : 1));
   meshes.forEach((m, i) => {
     const n = Math.max(1, Math.round((count * triCounts[i]) / totalTri));
-    const sampler = new MeshSurfaceSampler(m).build();
+    const sampler = getSurfaceSampler(m);
     for (let k = 0; k < n && a.idx < count; k++) {
       sampler.sample(_sp, _sn);
       _sp.applyMatrix4(m.matrixWorld);
@@ -1120,7 +1149,7 @@ function placeScan(key, x, z, height, count, rotY = 0, opts = {}) {
     const tan = new THREE.Vector3();
     const per = Math.ceil(strokeN / meshes.length);
     meshes.forEach((m) => {
-      const sampler = new MeshSurfaceSampler(m).build();
+      const sampler = getSurfaceSampler(m);
       for (let k = 0; k < per; k++) {
         sampler.sample(_sp, _sn);
         _sp.applyMatrix4(m.matrixWorld);
@@ -1622,7 +1651,7 @@ function buildTransitObjects(onDone) {
          霧に沈むシルエットは、密度を上げた点描だけのほうが静かで美しい。 */
       /* 霧に沈むシルエットなので、粒の密度は見た目にほとんど効かない。
          常に十数本が視界の前後にいる＝ここが総量に一番効く */
-      placeScan(key, x, z, h, Math.round(h * 150), Math.random() * Math.PI * 2, { strokes: 0 });
+      perf("placeScan:" + key, () => placeScan(key, x, z, h, Math.round(h * 150), Math.random() * Math.PI * 2, { strokes: 0 }));
     }
     if (i < TRANSIT_OBJECTS.length) requestAnimationFrame(step);
     else if (onDone) onDone();
@@ -2090,7 +2119,7 @@ Promise.all(
   let builtCount = 0;
   function buildNextArea() {
     if (builtCount >= buildOrder.length) return;
-    buildOrder[builtCount].build();
+    perf("build:" + buildOrder[builtCount].name, () => buildOrder[builtCount].build());
     builtCount++;
     if (builtCount === 2) {
       /* 綿毛はローディング開始時点で既に生成・浮遊させてある（上記参照）。
