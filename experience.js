@@ -2867,8 +2867,9 @@ function makeRoomPhotoMat(tex) {
         vec3 img = srgbToLinear(texture2D(uTex, clamp(uv, 0.0, 1.0)).rgb);
         /* 露出を持ち上げる（紙・影には掛けず、写真本体だけ）。
            乗算だけだとハイライトから飽和するので、暗部を持ち上げる補正も併用する。
-           元の値（0.82 / 1.15→0.75 / 1.22）からさらにもう一段明るく */
-        img = pow(img, vec3(0.70)) * 1.27;
+           元の値（0.82 / 1.15→0.75 / 1.22→0.70 / 1.27）から、
+           まだ暗いとの指摘を受けさらにもう一段明るく */
+        img = pow(img, vec3(0.64)) * 1.33;
         img = linearToSrgb(img); /* ここでsRGB値に戻す。以降は他の色と同じ空間で混ぜる */
         img = mix(img, img * 1.06, circle * uHover);
 
