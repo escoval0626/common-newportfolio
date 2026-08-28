@@ -4020,13 +4020,20 @@ let loadCompleted = false;
    刻みでしか更新されず、複数文字がまとまって段階的に出現する
    カクついた見え方になっていた。rAF（renderer.setAnimationLoop、
    メインループから毎フレーム呼ばれる）ベースに変え、進捗判定・
-   revealCharsの呼び出しをフレームレート相当まで滑らかにする */
+   revealCharsの呼び出しをフレームレート相当まで滑らかにする。
+   さらに、表示用の進捗を「実進捗と時間進捗の遅い方」にしていたため、
+   5モデルの読み込みが不揃いに完了するとloadedCount/totalCountが
+   0→20→40→60→80→100%と階段状に飛び、その不安定さがそのまま
+   文字のフェードインに伝わって「安定しない動き」に見えていた。
+   表示用の進捗は常に経過時間だけに基づく滑らかなカーブに固定し、
+   実際の読み込み状況は「先に進んでよいか」のゲートとしてのみ使う
+   （読み込みがまだなら99%で足踏みし、100%には到達させない） */
 function updateLoadProgress() {
   if (loadCompleted) return;
-  const realPct = (loadedCount / totalCount) * 100;
+  const loaded = loadedCount >= totalCount && sceneReady;
   const elapsed = performance.now() - loadStartTime;
-  const timePct = Math.min(100, (elapsed / MIN_LOAD_MS) * 100);
-  const shown = Math.min(realPct, timePct);
+  const cap = loaded ? 100 : 99;
+  const shown = Math.min(cap, (elapsed / MIN_LOAD_MS) * 100);
   loaderStatus.textContent = `LOADING ${Math.round(shown)}%`;
   /* 円環の代わりに、COMMON／タグラインの文字が進捗に応じて
      1文字ずつ霧の中から像を結んでいく */
@@ -4037,7 +4044,7 @@ function updateLoadProgress() {
      3D空間の構造（モデル＋配置）さえ整えば旅は始められ、写真は各情景に
      近づく間にバックグラウンドで届いて距離ベースのopacityでフェードインする
      （updateArtworksが元々そう作られている）ので、待たずに入って問題ない */
-  if (loadedCount >= totalCount && sceneReady && elapsed >= MIN_LOAD_MS) {
+  if (loaded && elapsed >= MIN_LOAD_MS) {
     loadCompleted = true;
     loaderStatus.textContent = "READY";
     revealChars(brandChars, 1);
