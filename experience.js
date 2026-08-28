@@ -3642,7 +3642,13 @@ function openGallery(area) {
 /* 閉じる：開いたのと同じタイムラインを逆再生する。
    別実装で"戻し"を書くと往路と復路がズレるが、reverse なら完全に対称になる。
    （写真 → 粒子 → 色面 → 線 の順に、来た道をそのまま戻る） */
-function closeGallery() {
+/* instant=true は warpTo() からの呼び出し専用。フェードヴェールが
+   完全に不透明でいられる時間はごく短く、通常の tl.reverse()（逆再生、
+   実質1秒近く）だとヴェールが薄くなるより前に終わらず、
+   「カルーセルが閉じていく巻き戻り」がフェードインの裏に透けて
+   見えてしまっていた。instant時はアニメーションを飛ばし、
+   タイムラインを開始状態へ即座に戻す */
+function closeGallery(instant = false) {
   if (activeRoom && activeRoom.zoomed) closeZoom(); /* 見ていた1枚を壁へ戻してから出る */
   if (zoomCap) zoomCap.style.opacity = "0";
   /* updateRoomCaption() は updateRoom() の中でしか呼ばれず、updateRoom() は
@@ -3678,9 +3684,21 @@ function closeGallery() {
   if (activeRoom && activeRoom.artworks) {
     activeRoom.artworks.forEach((a) => { a.group.visible = true; });
   }
+  const closingRoom = activeRoom; /* nullにする前に、後片付け用に保持しておく */
   activeRoom = null;              /* 先に操作対象を旅へ戻す */
   document.body.style.cursor = "";
   if (!tl) { galleryOpen = false; return; }
+  if (instant) {
+    /* onReverseCompleteは自然にreverse()が終わった時だけ発火するため、
+       progress(0)で開始状態へ飛ばす場合は同じ後片付けをここで手動で行う */
+    tl.progress(0).kill();
+    tl = null;
+    transitionActive = false;
+    galleryOpen = false;
+    rig.detour = 0;
+    if (closingRoom) closingRoom.group.visible = false;
+    return;
+  }
   transitionActive = true;
   tl.timeScale(1.7 * (REDUCE_MOTION ? 6 : 1)).reverse(); /* 戻りは速く。往復のコストを下げる */
 }
@@ -3902,7 +3920,7 @@ const dotsWrap = document.getElementById("dots");
    意図した体験なのでそのまま残す */
 const jumpVeil = document.getElementById("jumpVeil");
 function warpTo(targetT) {
-  if (galleryOpen) closeGallery();
+  if (galleryOpen) closeGallery(true); /* 逆再生の巻き戻りを見せず、即座に閉じる */
   rig.started = true;
   rig.lastInput = performance.now();
   gsap.timeline()
