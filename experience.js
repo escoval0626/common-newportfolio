@@ -3889,44 +3889,41 @@ const loaderStatus = document.getElementById("loaderStatus");
 const enterBtn = document.getElementById("enterBtn");
 const enterLabel = document.getElementById("enterLabel");
 const loaderTagline = document.getElementById("loaderTagline");
-/* COMMON／タグラインを1文字ずつspanに分割し、読み込み進捗に応じて
-   霧の中から像を結ぶように（blur解除＋フェード＋わずかな浮上）
-   1文字ずつ現れさせる。既存の「霧が晴れる」語彙を文字単位に落とし込む */
-function splitChars(el) {
+/* COMMON／タグラインを1文字ずつspanに分割し、霧の中から像を結ぶように
+   1文字ずつ現れさせる。既存の「霧が晴れる」語彙を文字単位に落とし込む。
+
+   ★演出の実行はCSSアニメーションに任せ、JSはanimation-delayを一度
+   書き込むだけにしている。理由はexperience.html側 .loader__char の
+   コメント参照（ローディング中はシーン構築がメインスレッドを最長1.7秒
+   ブロックするため、rAF駆動のGSAPでは演出そのものが固まってしまう）。 */
+function splitChars(el, baseDelay, step) {
   const text = el.textContent;
   el.textContent = "";
-  const spans = [...text].map((ch) => {
+  const spans = [...text].map((ch, i) => {
     const span = document.createElement("span");
     span.className = "loader__char";
-    span.textContent = ch === " " ? " " : ch;
+    span.textContent = ch === " " ? " " : ch;
+    /* 完全な等間隔だと機械的に見えるので、わずかな乱れを混ぜて
+       不揃いに像を結ぶ有機的な間をつくる */
+    span.style.animationDelay = `${(baseDelay + i * step + Math.random() * 0.05).toFixed(3)}s`;
     el.appendChild(span);
     return span;
   });
   return spans;
 }
-const brandChars = splitChars(document.getElementById("loaderBrandWord"));
+/* 全文字が出揃うまで：ブランドは0秒から、タグラインは0.22秒から始まり、
+   最後の文字が収束するのが約1.5秒後。MIN_LOAD_MSはこれに合わせてある */
+const brandChars = splitChars(document.getElementById("loaderBrandWord"), 0, 0.05);
 const brandMark = document.getElementById("loaderBrandMark");
-if (brandMark) brandChars.push(brandMark); /* © も文字の一員として同じ扱いにする */
-const taglineChars = splitChars(loaderTagline);
-function revealChars(chars, p) {
-  const n = chars.length;
-  chars.forEach((span, i) => {
-    if (span.dataset.shown) return;
-    if (p >= i / n) {
-      span.dataset.shown = "1";
-      /* 全文字が同じ速度でスッと出ると機械的に見えるため、
-         1文字ごとにduration/delayへわずかな乱数を持たせ、
-         不揃いに近づいてくるような有機的な間を作る。
-         power3.outで、像を結ぶ終盤ほどゆっくり収束させる */
-      gsap.to(span, {
-        opacity: 1, scale: 1,
-        duration: 1.1 + Math.random() * 0.5,
-        delay: Math.random() * 0.12,
-        ease: "power3.out",
-      });
-    }
-  });
+if (brandMark) {
+  /* © も文字の一員として同じ扱いにする */
+  brandMark.style.animationDelay = `${(brandChars.length * 0.05).toFixed(3)}s`;
+  brandChars.push(brandMark);
 }
+const taglineChars = splitChars(loaderTagline, 0.22, 0.022);
+/* 分割が済んだ時点で発火。以降の描画はコンポジタスレッドが担当し、
+   メインスレッドが何をしていても影響を受けない */
+loaderContent.classList.add("is-revealing");
 const hud = document.getElementById("hud");
 const hint = document.getElementById("hint");
 /* HTML側の初期文言はマウス操作前提。タッチ端末では最初の表示から入れ替える */
@@ -4012,22 +4009,21 @@ if (hudContact) {
    逆算した進捗」の遅い方を採用し、最低でもMIN_LOAD_MSはかけて
    100%に到達するようにする（実際に読み込みが遅い場合はそのまま伸びる） */
 const loadStartTime = performance.now();
-const MIN_LOAD_MS = 1200;
+/* CSSアニメーション側で最後の文字が収束しきるのが約1.5秒後（splitChars
+   のdelay設計＋本体0.75秒）。文字が出揃う前にENTERが現れてしまわない
+   よう、READYまでの最短時間をそこに合わせる */
+const MIN_LOAD_MS = 1500;
 let loadCompleted = false;
 
-/* 以前はsetInterval(150ms)でポーリングしていたが、GSAPの個々のtween
-   自体は滑らかでも、「どの文字がいつ出現し始めるか」の判定が150ms
-   刻みでしか更新されず、複数文字がまとまって段階的に出現する
-   カクついた見え方になっていた。rAF（renderer.setAnimationLoop、
-   メインループから毎フレーム呼ばれる）ベースに変え、進捗判定・
-   revealCharsの呼び出しをフレームレート相当まで滑らかにする。
-   さらに、表示用の進捗を「実進捗と時間進捗の遅い方」にしていたため、
-   5モデルの読み込みが不揃いに完了するとloadedCount/totalCountが
-   0→20→40→60→80→100%と階段状に飛び、その不安定さがそのまま
-   文字のフェードインに伝わって「安定しない動き」に見えていた。
-   表示用の進捗は常に経過時間だけに基づく滑らかなカーブに固定し、
-   実際の読み込み状況は「先に進んでよいか」のゲートとしてのみ使う
-   （読み込みがまだなら99%で足踏みし、100%には到達させない） */
+/* 文字の出現そのものはCSSアニメーションに任せてあり（splitChars参照）、
+   この関数がやるのは進捗テキストの更新と「いつREADYに切り替えるか」の
+   判定だけ。以前はここでrevealChars／GSAPを毎フレーム駆動していたが、
+   ローディング中はaddSceneDustがメインスレッドを最長1.7秒ブロックする
+   ため、rAF駆動では演出そのものが固まっていた。
+   表示用の進捗も、実進捗（loadedCount/totalCount）だと5モデルの完了が
+   不揃いで0→20→40…と階段状に飛ぶため、経過時間ベースの一定カーブに
+   固定し、実際の読み込み状況は「先に進んでよいか」のゲートとしてのみ
+   使う（読み込みがまだなら99%で足踏みし、100%には到達させない） */
 function updateLoadProgress() {
   if (loadCompleted) return;
   const loaded = loadedCount >= totalCount && sceneReady;
@@ -4035,10 +4031,6 @@ function updateLoadProgress() {
   const cap = loaded ? 100 : 99;
   const shown = Math.min(cap, (elapsed / MIN_LOAD_MS) * 100);
   loaderStatus.textContent = `LOADING ${Math.round(shown)}%`;
-  /* 円環の代わりに、COMMON／タグラインの文字が進捗に応じて
-     1文字ずつ霧の中から像を結んでいく */
-  revealChars(brandChars, shown / 100);
-  revealChars(taglineChars, shown / 100);
   /* 以前は全パネル画像（写真・コラージュ、200枚以上）を含む panelPending===0 まで
      待たせていたが、これが初回訪問者を最も長く足止めする箇所だった。
      3D空間の構造（モデル＋配置）さえ整えば旅は始められ、写真は各情景に
@@ -4047,37 +4039,17 @@ function updateLoadProgress() {
   if (loaded && elapsed >= MIN_LOAD_MS) {
     loadCompleted = true;
     loaderStatus.textContent = "READY";
-    revealChars(brandChars, 1);
-    revealChars(taglineChars, 1);
     /* 綿毛が一度だけ大きく揺れる合図（updateFluff参照）。
        「旅の起点が呼びかけ、文字が浮かび上がる」という因果関係にする */
     fluffBurstAt = performance.now();
+    /* ENTERの出現も、READYの退場も、CSS側のクラス切り替えだけで行う。
+       JSはクラスを付けるところまでで、描画はコンポジタに委ねる */
     enterBtn.classList.add("is-ready");
+    loaderStatus.classList.add("is-done");
     /* opacity/pointer-eventsだけの制御だと、支援技術やフォーム送信は
        「押せるボタン」として扱ってしまう。実際に押せるようになるまでは
        意味的にもdisabledにしておく */
     enterBtn.disabled = false;
-    /* 「READY」と「ENTER」が画面に同時に残ると、同じ意味の情報が
-       重複して見える。以前はREADYのフェードアウト完了(1.2s)から
-       ENTERのフェードイン完了(2.55s)までの間に約1.35秒の「どちらも
-       主張していない空白」が生じていた。両方の所要時間を大きく縮め、
-       ほぼ重なるタイミングで入れ替える */
-    gsap.to(loaderStatus, { opacity: 0, duration: 0.6, ease: "power2.out" });
-    /* ENTERの文字は、COMMON／タグラインと同じく縮小状態から
-       フェード＋ズームインで静かに浮かび上がる（CSSのtransitionでは
-       なくGSAPで制御する） */
-    if (enterLabel) {
-      gsap.to(enterLabel, {
-        opacity: 1, scale: 1,
-        duration: 0.9, delay: 0.1, ease: "power2.out",
-        onComplete: () => {
-          /* 下線が伸びきった直後、ラベル全体を一度だけ小さく上下させる。
-             常時ループさせるとうるさいので1回のみ＝「ここが動く＝
-             触れる場所」だと能動的に知らせるための単発モーション */
-          gsap.to(enterLabel, { y: -3, duration: 0.32, ease: "power1.inOut", yoyo: true, repeat: 1, delay: 0.15 });
-        },
-      });
-    }
   }
 }
 

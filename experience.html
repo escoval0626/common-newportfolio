@@ -330,19 +330,34 @@
       margin-top: 2px;
       text-shadow: 0 0 8px #f7f6f2, 0 0 16px #f7f6f2, 0 0 4px #f7f6f2;
     }
-    /* COMMON／タグラインの各文字（JS側でspanに分割）。進捗が該当文字の
-       しきい値を超えるたびに、少し縮んだ状態からフェードしながら
-       実寸へズームインする＝奥からゆっくり近づいてくる浮かび上がり方。
-       ぼかしより輪郭がシャープに保たれ、タイポグラフィそのものの
-       質感で見せられる */
+    /* COMMON／タグラインの各文字（JS側でspanに分割）。少し縮んだ状態から
+       フェードしながら実寸へズームインする＝奥からゆっくり近づいてくる
+       浮かび上がり方。輪郭がシャープに保たれ、タイポグラフィそのものの
+       質感で見せられる。
+       起点が0.72だと16px前後の文字でピクセル差が4〜5pxしかなく「ズーム
+       イン」が知覚できなかったため、0.5まで縮めて変化量を出している。
+
+       ★ここをGSAP（JS）ではなくCSSアニメーションで書いている理由：
+       ローディング中はaddSceneDust（12枚×2600粒子＋1枚×10000粒子の
+       画像サンプリング）がメインスレッドを占有し、実測で合計10.2秒・
+       最長1.7秒の完全ブロックが発生している。GSAPはメインスレッドの
+       requestAnimationFrameで動くため、その間tweenが1フレームも進まず
+       演出が固まって見えていた。transform/opacityだけのCSSアニメーション
+       はコンポジタスレッドで実行され、メインスレッドが止まっていても
+       滑らかに動き続ける。だから演出はJSから完全に切り離す */
     .loader__char {
       display: inline-block;
       opacity: 0;
-      /* 0.72→1では16px前後の文字でピクセル差が4〜5pxしかなく、
-         「ズームイン」のつもりが実質ただの長いフェードにしか見えない
-         というADレビューの指摘を受け、起点をさらに縮めて変化量そのもの
-         を知覚できる大きさにした */
       transform: scale(0.5);
+    }
+    @keyframes loaderCharIn {
+      from { opacity: 0; transform: scale(0.5); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+    /* animation-delay は文字ごとにJS側でインライン設定する（1回だけの
+       スタイル書き込みで済み、以降はコンポジタ任せになる） */
+    .loader-content.is-revealing .loader__char {
+      animation: loaderCharIn 0.75s cubic-bezier(0.16, 1, 0.3, 1) both;
     }
     /* 進捗の数値は情報としては残すが、タグラインより手前に出ないよう
        ブランド行と同じ弱さに揃える（以前は --ink・13px で画面内の
@@ -352,6 +367,10 @@
       min-height: 1.4em;
       text-shadow: 0 0 8px #f7f6f2, 0 0 16px #f7f6f2, 0 0 4px #f7f6f2;
     }
+    /* 「READY」と「ENTER」が同時に残ると意味が重複するため、ENTERの
+       出現と入れ替わりに退場させる。これもGSAPではなくCSSで行う
+       （メインスレッドのブロック中でも滑らかに消えるように） */
+    .loader__status.is-done { opacity: 0; transition: opacity 0.6s ease-out; }
     /* ENTER＝タイポグラフィのみ。ただし装飾テキスト（COMMON／タグライン）
        と同じ視覚文法のままだと、どれが押せるボタンなのか区別がつかない。
        サイズ・ウェイトを一段強くし、is-ready到達時にだけ専用の下線を
@@ -364,10 +383,6 @@
       cursor: pointer; pointer-events: none;
     }
     .loader__enter.is-ready { pointer-events: auto; }
-    /* 浮かび上がり（opacity/transform）はGSAP（experience.js）が
-       READY到達時に一度だけtweenする。CSSにtransitionを持たせると
-       インライン設定と二重にアニメーションしてしまうため、ここでは
-       開始状態（縮んで透明な状態）だけを定義する */
     .loader__enter-label {
       display: inline-block;
       position: relative;
@@ -375,10 +390,24 @@
       opacity: 0;
       transform: scale(0.5);
     }
+    /* 浮かび上がりと、そのあと一度だけの上下の"合図"を1本のkeyframesに
+       まとめる。別々のアニメーションにするとtransformが競合するうえ、
+       GSAPで後追いさせるとメインスレッドのブロックに巻き込まれる */
+    @keyframes loaderEnterIn {
+      0%   { opacity: 0; transform: scale(0.5) translateY(0);
+             animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1); }
+      55%  { opacity: 1; transform: scale(1) translateY(0);
+             animation-timing-function: ease-in-out; }
+      72%  { transform: scale(1) translateY(-3px);
+             animation-timing-function: ease-in-out; }
+      90%, 100% { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    .loader__enter.is-ready .loader__enter-label {
+      animation: loaderEnterIn 1.5s 0.1s both;
+    }
     /* CTA専用の下線。装飾テキストには一切付与しない。is-readyになった
        瞬間だけ左から右へ伸び、「ここが動く＝触れる場所」だと知らせる。
-       ラベル本体（GSAP側でdelay:0.1sから浮かび上がる）より下線が
-       0.1s早く動き出していたズレを、同じdelayを与えて揃えた */
+       ラベル本体（0.1s後から浮かび上がる）と起点を揃えてある */
     .loader__enter-label::after {
       content: "";
       position: absolute; left: 0; right: 0; bottom: -6px;
