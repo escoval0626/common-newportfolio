@@ -1528,15 +1528,29 @@ const TRANSIT_OBJECTS = [
   ["deadtree", -13.0, -16, 6.0], ["deadtree", -14.0, -46, 6.5],
   ["deadtree",  13.0, -72, 6.0], ["deadtree", -13.5, -108, 6.2],
 ];
-function buildTransitObjects() {
-  for (const [key, x, z, h] of TRANSIT_OBJECTS) {
-    /* ハッチング線は入れない（strokes: 0）。
-       遠景で線を引くと、木の形にならず"短い線の断片"が空中に散らばって見える。
-       霧に沈むシルエットは、密度を上げた点描だけのほうが静かで美しい。 */
-    /* 霧に沈むシルエットなので、粒の密度は見た目にほとんど効かない。
-       常に十数本が視界の前後にいる＝ここが総量に一番効く */
-    placeScan(key, x, z, h, Math.round(h * 150), Math.random() * Math.PI * 2, { strokes: 0 });
+/* 20個のTRANSIT_OBJECTS全てを1フレームで処理すると、placeScan内部の
+   MeshSurfaceSampler構築（三角形面積の累積分布を作る、モデルの複雑さに
+   比例して重い処理）が同期的に積み重なり、5モデルの読み込み完了直後に
+   メインスレッドが数百ms単位でブロックされてカクついていた。
+   1フレームあたり数個ずつに分割し、rAFを挟んで処理を逃がす */
+function buildTransitObjects(onDone) {
+  let i = 0;
+  const BATCH = 3;
+  function step() {
+    const end = Math.min(TRANSIT_OBJECTS.length, i + BATCH);
+    for (; i < end; i++) {
+      const [key, x, z, h] = TRANSIT_OBJECTS[i];
+      /* ハッチング線は入れない（strokes: 0）。
+         遠景で線を引くと、木の形にならず"短い線の断片"が空中に散らばって見える。
+         霧に沈むシルエットは、密度を上げた点描だけのほうが静かで美しい。 */
+      /* 霧に沈むシルエットなので、粒の密度は見た目にほとんど効かない。
+         常に十数本が視界の前後にいる＝ここが総量に一番効く */
+      placeScan(key, x, z, h, Math.round(h * 150), Math.random() * Math.PI * 2, { strokes: 0 });
+    }
+    if (i < TRANSIT_OBJECTS.length) requestAnimationFrame(step);
+    else if (onDone) onDone();
   }
+  step();
 }
 
 /* ============================================================
