@@ -2310,10 +2310,14 @@ function updateCamera(dt) {
 function updateFluff(t, dt) {
   if (!fluff) return;
   if (!rig.entered) {
-    /* 離脱前：タンポポの綿球のふちで震えている */
+    /* 離脱前：タンポポの綿球のふちで震えている。
+       ローダーのCOMMON／タグライン／ENTERは画面中央に縦積みされているため、
+       以前のオフセット（+0.42, +0.18）だと綿毛の頭がテキスト右端に
+       接近し、視認性を損なっていた。テキスト塊から離れた右上の
+       余白へ大きく逃がす */
     fluff.position.set(
-      HERO_HEAD.x + 0.42 + Math.sin(t * 1.3) * 0.02,
-      HERO_HEAD.y + 0.18 + Math.sin(t * 1.7) * 0.02,
+      HERO_HEAD.x + 1.1 + Math.sin(t * 1.3) * 0.02,
+      HERO_HEAD.y + 0.85 + Math.sin(t * 1.7) * 0.02,
       HERO_HEAD.z + Math.cos(t * 1.1) * 0.02
     );
     fluff.rotation.z = Math.sin(t * 0.9) * 0.1;
@@ -3838,12 +3842,36 @@ const loaderContent = document.getElementById("loaderContent");
 const loaderStatus = document.getElementById("loaderStatus");
 const enterBtn = document.getElementById("enterBtn");
 const enterLabel = document.getElementById("enterLabel");
-const loaderBrand = document.querySelector(".loader__brand");
-const loaderTagline = document.querySelector(".loader__tagline");
-/* COMMON／タグラインの文字間（em）。広い状態から読み込み進捗に応じて
-   締まっていき、通常時の見た目（CSS初期値と同じ終着点）に収束する */
-const BRAND_LS_FROM = 0.95, BRAND_LS_TO = 0.4;
-const TAGLINE_LS_FROM = 0.72, TAGLINE_LS_TO = 0.32;
+const loaderTagline = document.getElementById("loaderTagline");
+/* COMMON／タグラインを1文字ずつspanに分割し、読み込み進捗に応じて
+   霧の中から像を結ぶように（blur解除＋フェード＋わずかな浮上）
+   1文字ずつ現れさせる。既存の「霧が晴れる」語彙を文字単位に落とし込む */
+function splitChars(el) {
+  const text = el.textContent;
+  el.textContent = "";
+  const spans = [...text].map((ch) => {
+    const span = document.createElement("span");
+    span.className = "loader__char";
+    span.textContent = ch === " " ? " " : ch;
+    el.appendChild(span);
+    return span;
+  });
+  return spans;
+}
+const brandChars = splitChars(document.getElementById("loaderBrandWord"));
+const brandMark = document.getElementById("loaderBrandMark");
+if (brandMark) brandChars.push(brandMark); /* © も文字の一員として同じ扱いにする */
+const taglineChars = splitChars(loaderTagline);
+function revealChars(chars, p) {
+  const n = chars.length;
+  chars.forEach((span, i) => {
+    if (span.dataset.shown) return;
+    if (p >= i / n) {
+      span.dataset.shown = "1";
+      gsap.to(span, { opacity: 1, filter: "blur(0px)", y: 0, duration: 0.7, ease: "power2.out" });
+    }
+  });
+}
 const hud = document.getElementById("hud");
 const hint = document.getElementById("hint");
 /* HTML側の初期文言はマウス操作前提。タッチ端末では最初の表示から入れ替える */
@@ -3910,26 +3938,14 @@ if (hudContact) {
   });
 }
 
-/* letter-spacingの数値部分だけをGSAPでtween（quickToは同一プロパティへの
-   連続呼び出しを合成して滑らかに追従してくれるので、150ms間隔で値を
-   送り続けても後半でガクつかない）。単位のemは書き込み時に付け足す */
-const brandLsState = { v: BRAND_LS_FROM };
-const taglineLsState = { v: TAGLINE_LS_FROM };
-const setBrandLs = loaderBrand
-  ? gsap.quickTo(brandLsState, "v", { duration: 0.6, ease: "power2.out", onUpdate: () => { loaderBrand.style.letterSpacing = `${brandLsState.v}em`; } })
-  : null;
-const setTaglineLs = loaderTagline
-  ? gsap.quickTo(taglineLsState, "v", { duration: 0.6, ease: "power2.out", onUpdate: () => { loaderTagline.style.letterSpacing = `${taglineLsState.v}em`; } })
-  : null;
-
 const loadTick = setInterval(() => {
   const real = Math.round((loadedCount / totalCount) * 100);
   loaderStatus.textContent = `LOADING ${real}%`;
-  /* 円環の代わりに、COMMON／タグラインの文字間そのものが締まっていく
-     ことで進捗を示す */
+  /* 円環の代わりに、COMMON／タグラインの文字が進捗に応じて
+     1文字ずつ霧の中から像を結んでいく */
   const p = real / 100;
-  if (setBrandLs) setBrandLs(BRAND_LS_FROM - (BRAND_LS_FROM - BRAND_LS_TO) * p);
-  if (setTaglineLs) setTaglineLs(TAGLINE_LS_FROM - (TAGLINE_LS_FROM - TAGLINE_LS_TO) * p);
+  revealChars(brandChars, p);
+  revealChars(taglineChars, p);
   /* 以前は全パネル画像（写真・コラージュ、200枚以上）を含む panelPending===0 まで
      待たせていたが、これが初回訪問者を最も長く足止めする箇所だった。
      3D空間の構造（モデル＋配置）さえ整えば旅は始められ、写真は各情景に
@@ -3938,8 +3954,8 @@ const loadTick = setInterval(() => {
   if (loadedCount >= totalCount && sceneReady) {
     clearInterval(loadTick);
     loaderStatus.textContent = "READY";
-    if (setBrandLs) setBrandLs(BRAND_LS_TO);
-    if (setTaglineLs) setTaglineLs(TAGLINE_LS_TO);
+    revealChars(brandChars, 1);
+    revealChars(taglineChars, 1);
     enterBtn.classList.add("is-ready");
     /* opacity/pointer-eventsだけの制御だと、支援技術やフォーム送信は
        「押せるボタン」として扱ってしまう。実際に押せるようになるまでは

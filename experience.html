@@ -309,20 +309,26 @@
     .loader-content.is-hidden { opacity: 0; visibility: hidden; pointer-events: none; }
     /* 霧の奥にタンポポが像を結ぶため、文字は本編の詩コピーと同じく
        白ハローを敷いて可読性を確保する */
-    /* letter-spacingの初期値はJS側の起点（BRAND_LS_FROM）と合わせる。
-       CSSでも同じ値を持たせておかないと、JSが最初のloadTickを打つまでの
-       一瞬だけ文字間が詰まった状態で表示されてしまう */
     .loader__brand {
-      font-family: var(--font-latin); font-size: 14px; letter-spacing: 0.95em; color: var(--ink);
+      font-family: var(--font-latin); font-size: 14px; letter-spacing: 0.4em; color: var(--ink);
       text-shadow: 0 0 8px #f7f6f2, 0 0 16px #f7f6f2, 0 0 4px #f7f6f2;
     }
     /* JOURNEY＝綿毛の旅＝人生＝撮り溜めてきた写真、という比喩を一行に
        乗せるタグライン。BACK TO JOURNEY・CONTACT終端コピーと語彙を揃え、
        ここで初めて「写真のポートフォリオである」ことを明示する */
     .loader__tagline {
-      font-family: var(--font-latin); font-size: 10px; letter-spacing: 0.72em; color: var(--ink-dim);
+      font-family: var(--font-latin); font-size: 10px; letter-spacing: 0.32em; color: var(--ink-dim);
       margin-top: -14px;
       text-shadow: 0 0 8px #f7f6f2, 0 0 16px #f7f6f2, 0 0 4px #f7f6f2;
+    }
+    /* COMMON／タグラインの各文字（JS側でspanに分割）。進捗が該当文字の
+       しきい値を超えるたびに、霧の中からぼかしが解けて像を結ぶ＝
+       このサイトの「霧が晴れる」語彙を文字単位に落とし込んだもの */
+    .loader__char {
+      display: inline-block;
+      opacity: 0;
+      filter: blur(5px);
+      transform: translateY(5px);
     }
     /* 進捗の数値は情報としては残すが、タグラインより手前に出ないよう
        ブランド行と同じ弱さに揃える（以前は --ink・13px で画面内の
@@ -942,8 +948,8 @@
        .loaderのz-index:100に閉じ込められ、綿毛より手前に出せないため -->
   <div class="loader" id="loader"></div>
   <div class="loader-content" id="loaderContent">
-    <p class="loader__brand">COMMON<sup>©</sup></p>
-    <p class="loader__tagline">A PHOTOGRAPHIC JOURNEY</p>
+    <p class="loader__brand"><span id="loaderBrandWord">COMMON</span><sup class="loader__char" id="loaderBrandMark">©</sup></p>
+    <p class="loader__tagline" id="loaderTagline">A PHOTOGRAPHIC JOURNEY</p>
     <!-- 進捗は「LOADING 42%」という文字だけで見せていたが、画面内で
          いちばん強い情報量なのに素っ気なく、進捗そのものの手触りが
          無かった。円環（＝タンポポの頭花・綿毛の丸みと呼応する形）を
