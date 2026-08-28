@@ -3837,8 +3837,13 @@ const loader = document.getElementById("loader");
 const loaderContent = document.getElementById("loaderContent");
 const loaderStatus = document.getElementById("loaderStatus");
 const enterBtn = document.getElementById("enterBtn");
-const loaderRing = document.getElementById("loaderRing");
-const LOADER_RING_CIRC = 439.82; /* 2πr, r=70（experience.htmlのSVGと合わせる） */
+const enterLabel = document.getElementById("enterLabel");
+const loaderBrand = document.querySelector(".loader__brand");
+const loaderTagline = document.querySelector(".loader__tagline");
+/* COMMON／タグラインの文字間（em）。広い状態から読み込み進捗に応じて
+   締まっていき、通常時の見た目（CSS初期値と同じ終着点）に収束する */
+const BRAND_LS_FROM = 0.95, BRAND_LS_TO = 0.4;
+const TAGLINE_LS_FROM = 0.72, TAGLINE_LS_TO = 0.32;
 const hud = document.getElementById("hud");
 const hint = document.getElementById("hint");
 /* HTML側の初期文言はマウス操作前提。タッチ端末では最初の表示から入れ替える */
@@ -3905,10 +3910,26 @@ if (hudContact) {
   });
 }
 
+/* letter-spacingの数値部分だけをGSAPでtween（quickToは同一プロパティへの
+   連続呼び出しを合成して滑らかに追従してくれるので、150ms間隔で値を
+   送り続けても後半でガクつかない）。単位のemは書き込み時に付け足す */
+const brandLsState = { v: BRAND_LS_FROM };
+const taglineLsState = { v: TAGLINE_LS_FROM };
+const setBrandLs = loaderBrand
+  ? gsap.quickTo(brandLsState, "v", { duration: 0.6, ease: "power2.out", onUpdate: () => { loaderBrand.style.letterSpacing = `${brandLsState.v}em`; } })
+  : null;
+const setTaglineLs = loaderTagline
+  ? gsap.quickTo(taglineLsState, "v", { duration: 0.6, ease: "power2.out", onUpdate: () => { loaderTagline.style.letterSpacing = `${taglineLsState.v}em`; } })
+  : null;
+
 const loadTick = setInterval(() => {
   const real = Math.round((loadedCount / totalCount) * 100);
   loaderStatus.textContent = `LOADING ${real}%`;
-  if (loaderRing) loaderRing.style.strokeDashoffset = String(LOADER_RING_CIRC * (1 - real / 100));
+  /* 円環の代わりに、COMMON／タグラインの文字間そのものが締まっていく
+     ことで進捗を示す */
+  const p = real / 100;
+  if (setBrandLs) setBrandLs(BRAND_LS_FROM - (BRAND_LS_FROM - BRAND_LS_TO) * p);
+  if (setTaglineLs) setTaglineLs(TAGLINE_LS_FROM - (TAGLINE_LS_FROM - TAGLINE_LS_TO) * p);
   /* 以前は全パネル画像（写真・コラージュ、200枚以上）を含む panelPending===0 まで
      待たせていたが、これが初回訪問者を最も長く足止めする箇所だった。
      3D空間の構造（モデル＋配置）さえ整えば旅は始められ、写真は各情景に
@@ -3917,12 +3938,22 @@ const loadTick = setInterval(() => {
   if (loadedCount >= totalCount && sceneReady) {
     clearInterval(loadTick);
     loaderStatus.textContent = "READY";
-    if (loaderRing) loaderRing.style.strokeDashoffset = "0";
+    if (setBrandLs) setBrandLs(BRAND_LS_TO);
+    if (setTaglineLs) setTaglineLs(TAGLINE_LS_TO);
     enterBtn.classList.add("is-ready");
     /* opacity/pointer-eventsだけの制御だと、支援技術やフォーム送信は
        「押せるボタン」として扱ってしまう。実際に押せるようになるまでは
        意味的にもdisabledにしておく */
     enterBtn.disabled = false;
+    /* ENTERの文字は、霧の中から像を結ぶように、ぼかしが解けながら
+       静かに浮かび上がる（CSSのtransitionではなくGSAPで制御し、
+       進捗の締まりと呼応する余韻の長いイージングをつける） */
+    if (enterLabel) {
+      gsap.to(enterLabel, {
+        opacity: 1, filter: "blur(0px)", y: 0,
+        duration: 1.6, ease: "power2.out",
+      });
+    }
   }
 }, 150);
 

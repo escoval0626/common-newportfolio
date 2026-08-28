@@ -309,15 +309,18 @@
     .loader-content.is-hidden { opacity: 0; visibility: hidden; pointer-events: none; }
     /* 霧の奥にタンポポが像を結ぶため、文字は本編の詩コピーと同じく
        白ハローを敷いて可読性を確保する */
+    /* letter-spacingの初期値はJS側の起点（BRAND_LS_FROM）と合わせる。
+       CSSでも同じ値を持たせておかないと、JSが最初のloadTickを打つまでの
+       一瞬だけ文字間が詰まった状態で表示されてしまう */
     .loader__brand {
-      font-family: var(--font-latin); font-size: 14px; letter-spacing: 0.4em; color: var(--ink);
+      font-family: var(--font-latin); font-size: 14px; letter-spacing: 0.95em; color: var(--ink);
       text-shadow: 0 0 8px #f7f6f2, 0 0 16px #f7f6f2, 0 0 4px #f7f6f2;
     }
     /* JOURNEY＝綿毛の旅＝人生＝撮り溜めてきた写真、という比喩を一行に
        乗せるタグライン。BACK TO JOURNEY・CONTACT終端コピーと語彙を揃え、
        ここで初めて「写真のポートフォリオである」ことを明示する */
     .loader__tagline {
-      font-family: var(--font-latin); font-size: 10px; letter-spacing: 0.32em; color: var(--ink-dim);
+      font-family: var(--font-latin); font-size: 10px; letter-spacing: 0.72em; color: var(--ink-dim);
       margin-top: -14px;
       text-shadow: 0 0 8px #f7f6f2, 0 0 16px #f7f6f2, 0 0 4px #f7f6f2;
     }
@@ -329,53 +332,30 @@
       min-height: 1.4em;
       text-shadow: 0 0 8px #f7f6f2, 0 0 16px #f7f6f2, 0 0 4px #f7f6f2;
     }
-    /* ENTER＝円環プログレス。矩形の枠線ボタンは、綿毛・タンポポ・
-       詩コピーの縦組みなど「丸み／縦の流れ」で組まれたこのサイトの
-       語彙の中で、ここだけ無地の四角がぽつんと浮いて見えていた。
-       円は綿毛の頭部と同じ形なので、旅の起点としての一体感が出る */
+    /* ENTER＝タイポグラフィのみ。円環・数値でなく、COMMON／タグラインの
+       文字間そのものが進捗に応じて締まっていく（JS側でletter-spacingを
+       直接更新）。ENTERの文字は環が閉じるのではなく、霧の中から像を
+       結ぶように、ぼかしの解けと共に静かに浮かび上がる */
     .loader__enter {
       position: relative;
-      width: 148px; height: 148px;
       margin-top: 8px;
-      border-radius: 50%;
-      background: rgba(247, 246, 242, 0.6);
-      border: none; padding: 0;
-      display: flex; align-items: center; justify-content: center;
-      /* 以前はボタン全体をopacity:0にして is-ready まで隠していたが、
-         それだと肝心の進捗リングまで読み込み中は見えなくなってしまい、
-         「進捗を視覚化する」目的を果たせていなかった。円とリングは
-         最初から見せ、is-readyまで隠すのは中のENTER文字だけにする */
+      background: none;
+      border: none; padding: 10px 0;
       cursor: pointer; pointer-events: none;
-      transition: transform 0.4s ease, background 0.4s ease;
     }
     .loader__enter.is-ready { pointer-events: auto; }
-    .loader__enter:hover { transform: scale(1.045); background: rgba(247, 246, 242, 0.85); }
-    .loader__enter:active { transform: scale(0.98); }
-    .loader__ring { position: absolute; inset: 0; transform: rotate(-90deg); overflow: visible; }
-    .loader__ring-bg {
-      fill: none; stroke: rgba(28, 28, 28, 0.14); stroke-width: 1;
-    }
-    .loader__ring-fg {
-      fill: none; stroke: var(--ink); stroke-width: 1;
-      /* 円周 = 2πr（r=70） */
-      stroke-dasharray: 439.82;
-      stroke-dashoffset: 439.82;
-      stroke-linecap: round;
-      transition: stroke-dashoffset 0.25s ease-out;
-    }
-    /* 環が閉じ切る（is-ready）と、細い環から実線の円へ切り替わり、
-       ボタンとしての実在感を出す */
-    .loader__enter.is-ready .loader__ring-bg { opacity: 0; transition: opacity 0.6s ease; }
-    .loader__enter.is-ready .loader__ring-fg { stroke-width: 1.4; }
+    /* 浮かび上がり（opacity/filter/transform）はGSAP（experience.js）が
+       READY到達時に一度だけtweenする。CSSにtransitionを持たせると
+       インライン設定と二重にアニメーションしてしまうため、ここでは
+       開始状態（霧の中でぼやけている状態）だけを定義する */
     .loader__enter-label {
-      position: relative; z-index: 1;
-      font-family: var(--font-latin); font-size: 12px; letter-spacing: 0.32em; color: var(--ink);
-      /* 環が閉じ切るまではENTERの文字を伏せておく。環（進捗）が
-         完成した瞬間に文字が浮かび上がる＝「進捗の到達点＝行動の起点」 */
+      display: inline-block;
+      font-family: var(--font-latin); font-size: 13px; letter-spacing: 0.32em; color: var(--ink);
       opacity: 0;
-      transition: opacity 0.7s ease 0.15s;
+      filter: blur(6px);
+      transform: translateY(4px);
     }
-    .loader__enter.is-ready .loader__enter-label { opacity: 1; }
+    .loader__enter:hover .loader__enter-label { letter-spacing: 0.4em; }
 
     /* ===== HUD ===== */
     .hud { position: fixed; inset: 0; z-index: 10; pointer-events: none; opacity: 0; visibility: hidden; transition: opacity 1.4s ease 0.6s; }
@@ -971,10 +951,6 @@
          ようにする。環が閉じた瞬間にそのままENTERへ変わる、という
          「進捗の到達点＝行動の起点」を一体化させた見せ方 -->
     <button class="loader__enter" id="enterBtn" disabled>
-      <svg class="loader__ring" viewBox="0 0 148 148" aria-hidden="true">
-        <circle class="loader__ring-bg" cx="74" cy="74" r="70" />
-        <circle class="loader__ring-fg" id="loaderRing" cx="74" cy="74" r="70" />
-      </svg>
       <span class="loader__enter-label" id="enterLabel">ENTER</span>
     </button>
     <p class="loader__status" id="loaderStatus">LOADING 0%</p>
