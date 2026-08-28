@@ -86,6 +86,7 @@ http
             "Referrer-Policy": "strict-origin-when-cross-origin",
             "Content-Security-Policy":
               "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'sha256-MyzGJLvLJiAK6ZRWs4iLCdum7R3YuhvvouXCROeMvDU='; " +
+              "worker-src 'self'; " +
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
               "font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; " +
               "media-src 'self'; connect-src 'self' https://cdn.jsdelivr.net; " +

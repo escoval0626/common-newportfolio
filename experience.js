@@ -632,10 +632,74 @@ function featherMaterial(mat, skyCut = 0.0) {
   return mat;
 }
 
-/* 情景画像をピクセルサンプリングして、パネルと同じ面に点描を敷く。
-   ローカル座標（plane は 1 × aspect）で配置し、group のスケールに乗る。 */
-function addSceneDust(rec, group, imageUrl, aspect, count, lineUrl) {
-  panelPending++;
+/* 点描の生成は dust-worker.js（別スレッド）へ逃がしている。
+   画像サンプリングは処理量が大きく、メインスレッドで同期実行すると
+   実測で合計10,233ms・最長1,747msのブロックを生んでいた。
+   ワーカーが使えない環境（OffscreenCanvas非対応のSafari 16.4未満など）
+   では、従来どおりメインスレッドで組む buildDustSync に落ちる。 */
+let dustWorker = null;
+let dustWorkerUnavailable = false;
+let dustReqSeq = 0;
+const dustReqs = new Map();
+
+function getDustWorker() {
+  if (dustWorkerUnavailable) return null;
+  if (dustWorker) return dustWorker;
+  if (typeof Worker === "undefined" || typeof OffscreenCanvas === "undefined") {
+    dustWorkerUnavailable = true;
+    return null;
+  }
+  try {
+    dustWorker = new Worker("dust-worker.js");
+    dustWorker.onmessage = (e) => {
+      const req = dustReqs.get(e.data.id);
+      if (!req) return;
+      dustReqs.delete(e.data.id);
+      req(e.data);
+    };
+    /* ワーカー自体が読み込めない／落ちた場合は、以降を同期処理に切り替え、
+       返答待ちだったぶんもその場で組み直す（絵が欠けたままにしない） */
+    dustWorker.onerror = () => {
+      dustWorkerUnavailable = true;
+      dustWorker = null;
+      const pending = [...dustReqs.values()];
+      dustReqs.clear();
+      pending.forEach((req) => req({ ok: false, error: "worker error" }));
+    };
+  } catch (err) {
+    dustWorkerUnavailable = true;
+    return null;
+  }
+  return dustWorker;
+}
+
+/* 受け取った粒子データからThree.jsのオブジェクトを組む。
+   WebGLコンテキストはメインスレッドにあるので、ここだけは移せない */
+function applyDust(rec, group, d) {
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(d.pos, 3));
+  geo.setAttribute("aScatter", new THREE.BufferAttribute(d.scat, 3));
+  geo.setAttribute("aColor", new THREE.BufferAttribute(d.col, 3));
+  geo.setAttribute("aSeed", new THREE.BufferAttribute(d.seed, 1));
+  geo.setAttribute("aSize", new THREE.BufferAttribute(d.sizes, 1));
+  geo.setAttribute("aDelay", new THREE.BufferAttribute(d.delay, 1));
+  const mat = makeDustMat();
+  mat.uniforms.uPr.value = renderer.getPixelRatio();
+  dustMats.push(mat);
+  const pts = new THREE.Points(geo, mat);
+  /* 散らばった居場所（aScatter）＋風の分を境界球に足してから、画面外は描かない */
+  geo.computeBoundingSphere();
+  if (geo.boundingSphere) geo.boundingSphere.radius += 1.0;
+  pts.frustumCulled = true;
+  rec.dustPts = pts;
+  group.add(pts);
+  rec.dustMat = mat;
+  rec.dustGeo = geo;
+}
+
+/* 従来のメインスレッド版。ワーカーが使えない環境向けのフォールバックで、
+   アルゴリズムは dust-worker.js 側と完全に同じ（見た目を変えないため） */
+function buildDustSync(rec, group, imageUrl, aspect, count, lineUrl, done) {
   let edgeMap = null, emW = 0, emH = 0;
   /* 線画から「輪郭マップ」を作る：輪郭に近い粒子ほど早く着地させるため */
   function buildEdgeMap(cb) {
@@ -701,29 +765,42 @@ function addSceneDust(rec, group, imageUrl, aspect, count, lineUrl) {
       delay[idx] = (1.0 - Math.min(1, edge * 1.8)) * (0.5 + Math.random() * 0.5);
       idx++;
     }
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute("position", new THREE.BufferAttribute(pos.slice(0, idx * 3), 3));
-    geo.setAttribute("aScatter", new THREE.BufferAttribute(scat.slice(0, idx * 3), 3));
-    geo.setAttribute("aColor", new THREE.BufferAttribute(col.slice(0, idx * 3), 3));
-    geo.setAttribute("aSeed", new THREE.BufferAttribute(seed.slice(0, idx), 1));
-    geo.setAttribute("aSize", new THREE.BufferAttribute(sizes.slice(0, idx), 1));
-    geo.setAttribute("aDelay", new THREE.BufferAttribute(delay.slice(0, idx), 1));
-    const mat = makeDustMat();
-    mat.uniforms.uPr.value = renderer.getPixelRatio();
-    dustMats.push(mat);
-    const pts = new THREE.Points(geo, mat);
-    /* 散らばった居場所（aScatter）＋風の分を境界球に足してから、画面外は描かない */
-    geo.computeBoundingSphere();
-    if (geo.boundingSphere) geo.boundingSphere.radius += 1.0;
-    pts.frustumCulled = true;
-    rec.dustPts = pts;
-    group.add(pts);
-    rec.dustMat = mat;
-    rec.dustGeo = geo;
-    panelPending--;
+    applyDust(rec, group, {
+      pos: pos.slice(0, idx * 3),
+      scat: scat.slice(0, idx * 3),
+      col: col.slice(0, idx * 3),
+      seed: seed.slice(0, idx),
+      sizes: sizes.slice(0, idx),
+      delay: delay.slice(0, idx),
+    });
+    done();
   });
-  img.onerror = () => { panelPending--; };
+  img.onerror = () => done();
   img.src = imageUrl;
+}
+
+/* 情景画像をピクセルサンプリングして、パネルと同じ面に点描を敷く。
+   ローカル座標（plane は 1 × aspect）で配置し、group のスケールに乗る。 */
+function addSceneDust(rec, group, imageUrl, aspect, count, lineUrl) {
+  panelPending++;
+  let settled = false;
+  const done = () => { if (!settled) { settled = true; panelPending--; } };
+
+  const w = getDustWorker();
+  if (!w) { buildDustSync(rec, group, imageUrl, aspect, count, lineUrl, done); return; }
+
+  const id = ++dustReqSeq;
+  dustReqs.set(id, (msg) => {
+    if (msg && msg.ok) { applyDust(rec, group, msg); done(); return; }
+    /* ワーカー側で失敗（画像取得エラー等）したぶんは同期処理で組み直す */
+    buildDustSync(rec, group, imageUrl, aspect, count, lineUrl, done);
+  });
+  try {
+    w.postMessage({ id, imageUrl, lineUrl: lineUrl || null, aspect, count });
+  } catch (err) {
+    dustReqs.delete(id);
+    buildDustSync(rec, group, imageUrl, aspect, count, lineUrl, done);
+  }
 }
 
 function addPanel(lineUrl, washUrl, x, y, z, worldWidth, faceTo, opts = {}) {
