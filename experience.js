@@ -3871,10 +3871,10 @@ function revealChars(chars, p) {
       span.dataset.shown = "1";
       /* 全文字が同じ速度でスッと出ると機械的に見えるため、
          1文字ごとにduration/delayへわずかな乱数を持たせ、
-         霧が不揃いに晴れていくような有機的な間を作る。
+         不揃いに近づいてくるような有機的な間を作る。
          power3.outで、像を結ぶ終盤ほどゆっくり収束させる */
       gsap.to(span, {
-        opacity: 1, filter: "blur(0px)", y: 0,
+        opacity: 1, scale: 1,
         duration: 1.1 + Math.random() * 0.5,
         delay: Math.random() * 0.12,
         ease: "power3.out",
@@ -3975,12 +3975,13 @@ const loadTick = setInterval(() => {
        重複して見える。READYは完了の合図として一瞬だけ見せたら、
        ENTERの出現と入れ替わりに静かに退場させる */
     gsap.to(loaderStatus, { opacity: 0, duration: 1, delay: 0.2, ease: "power2.out" });
-    /* ENTERの文字は、霧の中から像を結ぶように、ぼかしが解けながら
-       静かに浮かび上がる（CSSのtransitionではなくGSAPで制御し、
-       進捗の締まりと呼応する余韻の長いイージングをつける） */
+    /* ENTERの文字は、COMMON／タグラインと同じく縮小状態から
+       フェード＋ズームインで静かに浮かび上がる（CSSのtransitionでは
+       なくGSAPで制御し、進捗の締まりと呼応する余韻の長いイージングを
+       つける） */
     if (enterLabel) {
       gsap.to(enterLabel, {
-        opacity: 1, filter: "blur(0px)", y: 0,
+        opacity: 1, scale: 1,
         duration: 2.2, delay: 0.35, ease: "power3.out",
       });
     }

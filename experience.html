@@ -322,13 +322,14 @@
       text-shadow: 0 0 8px #f7f6f2, 0 0 16px #f7f6f2, 0 0 4px #f7f6f2;
     }
     /* COMMON／タグラインの各文字（JS側でspanに分割）。進捗が該当文字の
-       しきい値を超えるたびに、霧の中からぼかしが解けて像を結ぶ＝
-       このサイトの「霧が晴れる」語彙を文字単位に落とし込んだもの */
+       しきい値を超えるたびに、少し縮んだ状態からフェードしながら
+       実寸へズームインする＝奥からゆっくり近づいてくる浮かび上がり方。
+       ぼかしより輪郭がシャープに保たれ、タイポグラフィそのものの
+       質感で見せられる */
     .loader__char {
       display: inline-block;
       opacity: 0;
-      filter: blur(9px);
-      transform: translateY(9px);
+      transform: scale(0.72);
     }
     /* 進捗の数値は情報としては残すが、タグラインより手前に出ないよう
        ブランド行と同じ弱さに揃える（以前は --ink・13px で画面内の
@@ -338,10 +339,8 @@
       min-height: 1.4em;
       text-shadow: 0 0 8px #f7f6f2, 0 0 16px #f7f6f2, 0 0 4px #f7f6f2;
     }
-    /* ENTER＝タイポグラフィのみ。円環・数値でなく、COMMON／タグラインの
-       文字間そのものが進捗に応じて締まっていく（JS側でletter-spacingを
-       直接更新）。ENTERの文字は環が閉じるのではなく、霧の中から像を
-       結ぶように、ぼかしの解けと共に静かに浮かび上がる */
+    /* ENTER＝タイポグラフィのみ。円環・数値でなく、COMMON／タグラインと
+       同じ「縮小状態からフェード＋ズームイン」で静かに浮かび上がる */
     .loader__enter {
       position: relative;
       margin-top: 8px;
@@ -350,16 +349,15 @@
       cursor: pointer; pointer-events: none;
     }
     .loader__enter.is-ready { pointer-events: auto; }
-    /* 浮かび上がり（opacity/filter/transform）はGSAP（experience.js）が
+    /* 浮かび上がり（opacity/transform）はGSAP（experience.js）が
        READY到達時に一度だけtweenする。CSSにtransitionを持たせると
        インライン設定と二重にアニメーションしてしまうため、ここでは
-       開始状態（霧の中でぼやけている状態）だけを定義する */
+       開始状態（縮んで透明な状態）だけを定義する */
     .loader__enter-label {
       display: inline-block;
       font-family: var(--font-latin); font-size: 13px; letter-spacing: 0.32em; color: var(--ink);
       opacity: 0;
-      filter: blur(11px);
-      transform: translateY(10px);
+      transform: scale(0.72);
     }
     .loader__enter:hover .loader__enter-label { letter-spacing: 0.4em; }
 
