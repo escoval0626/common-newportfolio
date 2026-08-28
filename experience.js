@@ -2312,12 +2312,13 @@ function updateFluff(t, dt) {
   if (!rig.entered) {
     /* 離脱前：タンポポの綿球のふちで震えている。
        ローダーのCOMMON／タグライン／ENTERは画面中央に縦積みされているため、
-       以前のオフセット（+0.42, +0.18）だと綿毛の頭がテキスト右端に
-       接近し、視認性を損なっていた。テキスト塊から離れた右上の
-       余白へ大きく逃がす */
+       元のオフセット（+0.42, +0.18）だと綿毛の頭がテキスト右端に接近し
+       視認性を損なう一方、+1.1/+0.85まで離すと今度は画面の隅に寄り
+       すぎて存在感が薄れてしまった。テキスト塊とは重ならず、かつ
+       画面内に留まる中間の位置へ */
     fluff.position.set(
-      HERO_HEAD.x + 1.1 + Math.sin(t * 1.3) * 0.02,
-      HERO_HEAD.y + 0.85 + Math.sin(t * 1.7) * 0.02,
+      HERO_HEAD.x + 0.72 + Math.sin(t * 1.3) * 0.02,
+      HERO_HEAD.y + 0.5 + Math.sin(t * 1.7) * 0.02,
       HERO_HEAD.z + Math.cos(t * 1.1) * 0.02
     );
     fluff.rotation.z = Math.sin(t * 0.9) * 0.1;
@@ -3868,7 +3869,16 @@ function revealChars(chars, p) {
     if (span.dataset.shown) return;
     if (p >= i / n) {
       span.dataset.shown = "1";
-      gsap.to(span, { opacity: 1, filter: "blur(0px)", y: 0, duration: 0.7, ease: "power2.out" });
+      /* 全文字が同じ速度でスッと出ると機械的に見えるため、
+         1文字ごとにduration/delayへわずかな乱数を持たせ、
+         霧が不揃いに晴れていくような有機的な間を作る。
+         power3.outで、像を結ぶ終盤ほどゆっくり収束させる */
+      gsap.to(span, {
+        opacity: 1, filter: "blur(0px)", y: 0,
+        duration: 1.1 + Math.random() * 0.5,
+        delay: Math.random() * 0.12,
+        ease: "power3.out",
+      });
     }
   });
 }
@@ -3961,13 +3971,17 @@ const loadTick = setInterval(() => {
        「押せるボタン」として扱ってしまう。実際に押せるようになるまでは
        意味的にもdisabledにしておく */
     enterBtn.disabled = false;
+    /* 「READY」と「ENTER」が画面に同時に残ると、同じ意味の情報が
+       重複して見える。READYは完了の合図として一瞬だけ見せたら、
+       ENTERの出現と入れ替わりに静かに退場させる */
+    gsap.to(loaderStatus, { opacity: 0, duration: 1, delay: 0.2, ease: "power2.out" });
     /* ENTERの文字は、霧の中から像を結ぶように、ぼかしが解けながら
        静かに浮かび上がる（CSSのtransitionではなくGSAPで制御し、
        進捗の締まりと呼応する余韻の長いイージングをつける） */
     if (enterLabel) {
       gsap.to(enterLabel, {
         opacity: 1, filter: "blur(0px)", y: 0,
-        duration: 1.6, ease: "power2.out",
+        duration: 2.2, delay: 0.35, ease: "power3.out",
       });
     }
   }
