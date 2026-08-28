@@ -362,6 +362,18 @@
     .loader__enter:hover .loader__enter-label { letter-spacing: 0.4em; }
 
     /* ===== HUD ===== */
+    /* ロゴ／ドットナビ／CONTACTのような「遠くへ瞬間移動する」操作用の
+       フェードヴェール。以前はrig.targetを設定してrig.progressが
+       イージング付きで追いかけるだけだったため、通過済みの情景を
+       経路に沿って逆再生／早送りする形になり「巻き戻し」に見えていた。
+       このヴェールで一度画面を覆い、その裏でrig.progressを即座に
+       着地点へ差し替えることで、カット編集のような瞬間移動にする */
+    .jump-veil {
+      position: fixed; inset: 0; z-index: 90;
+      background: var(--bg);
+      opacity: 0;
+      pointer-events: none;
+    }
     .hud { position: fixed; inset: 0; z-index: 10; pointer-events: none; opacity: 0; visibility: hidden; transition: opacity 1.4s ease 0.6s; }
     /* ローダー表示中、hud__social-linkがpointer-events:autoで上書きしているため
        Tabキーで不可視のSNSリンクにフォーカスが飛んでしまう。visibilityで塞ぐ */
@@ -959,6 +971,9 @@
     </button>
     <p class="loader__status" id="loaderStatus">LOADING 0%</p>
   </div>
+
+  <!-- ロゴ／ドットナビ／CONTACTでの瞬間移動用フェードヴェール -->
+  <div class="jump-veil" id="jumpVeil"></div>
 
   <!-- HUD -->
   <div class="hud" id="hud">

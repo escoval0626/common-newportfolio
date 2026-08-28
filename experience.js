@@ -3892,6 +3892,28 @@ const captionTitle = document.getElementById("captionTitle");
 const progressBar = document.getElementById("progressBar");
 const dotsWrap = document.getElementById("dots");
 
+/* ロゴ／ドットナビ／CONTACTは、今いる場所から遠く離れた地点へ
+   一気に移動する操作。以前は rig.target を設定するだけで、
+   rig.progress がイージング付きで追いかける実装だったため、経路上を
+   逆再生・早送りする形になり「巻き戻し」に見えていた。
+   ここでは画面をヴェールで覆い、その裏で rig.progress を目的地へ
+   即座に差し替えることで、カット編集のような瞬間移動にする。
+   通常のスクロール／ドラッグによる経路移動（updateCamera内のlerp）は
+   意図した体験なのでそのまま残す */
+const jumpVeil = document.getElementById("jumpVeil");
+function warpTo(targetT) {
+  if (galleryOpen) closeGallery();
+  rig.started = true;
+  rig.lastInput = performance.now();
+  gsap.timeline()
+    .to(jumpVeil, { opacity: 1, duration: 0.42, ease: "power2.in" })
+    .add(() => {
+      rig.progress = targetT;
+      rig.target = targetT;
+    })
+    .to(jumpVeil, { opacity: 0, duration: 0.6, ease: "power2.out" }, "+=0.04");
+}
+
 const dots = AREAS.map((a) => {
   const wrap = document.createElement("div");
   wrap.className = "hud__dot-wrap";
@@ -3905,10 +3927,7 @@ const dots = AREAS.map((a) => {
   b.setAttribute("aria-label", `${a.name} へ移動`);
   b.addEventListener("click", (e) => {
     e.stopPropagation();
-    if (galleryOpen) closeGallery();
-    rig.started = true;
-    rig.target = a.t;
-    rig.lastInput = performance.now();
+    warpTo(a.t);
     hint.classList.add("is-faded");
   });
   wrap.appendChild(label);
@@ -3925,10 +3944,7 @@ if (hudLogo) {
   hudLogo.addEventListener("click", (e) => {
     e.stopPropagation();
     if (!rig.entered) return; /* ENTER前は押しても何もしない（旅がまだ始まっていない） */
-    if (galleryOpen) closeGallery();
-    rig.started = true;
-    rig.target = 0;
-    rig.lastInput = performance.now();
+    warpTo(0);
     hint.classList.remove("is-faded");
   });
 }
@@ -3940,10 +3956,7 @@ if (hudContact) {
   hudContact.addEventListener("click", (e) => {
     e.stopPropagation();
     if (!rig.entered) return;
-    if (galleryOpen) closeGallery();
-    rig.started = true;
-    rig.target = CONTACT_T;
-    rig.lastInput = performance.now();
+    warpTo(CONTACT_T);
     hint.classList.add("is-faded");
   });
 }
