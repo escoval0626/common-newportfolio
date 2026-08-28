@@ -2322,7 +2322,7 @@ function updateCamera(dt) {
 
 /* 綿毛：カメラの少し先を、風に揺れながら先導する */
 /* READY到達の瞬間だけ綿毛が一度大きく揺れる、その基準時刻。
-   -1は「まだ起きていない」を表す（loadTick側で発火させる） */
+   -1は「まだ起きていない」を表す（updateLoadProgress側で発火させる） */
 let fluffBurstAt = -1;
 function updateFluff(t, dt) {
   if (!fluff) return;
@@ -4013,25 +4013,32 @@ if (hudContact) {
    100%に到達するようにする（実際に読み込みが遅い場合はそのまま伸びる） */
 const loadStartTime = performance.now();
 const MIN_LOAD_MS = 1200;
+let loadCompleted = false;
 
-const loadTick = setInterval(() => {
-  const realPct = Math.round((loadedCount / totalCount) * 100);
+/* 以前はsetInterval(150ms)でポーリングしていたが、GSAPの個々のtween
+   自体は滑らかでも、「どの文字がいつ出現し始めるか」の判定が150ms
+   刻みでしか更新されず、複数文字がまとまって段階的に出現する
+   カクついた見え方になっていた。rAF（renderer.setAnimationLoop、
+   メインループから毎フレーム呼ばれる）ベースに変え、進捗判定・
+   revealCharsの呼び出しをフレームレート相当まで滑らかにする */
+function updateLoadProgress() {
+  if (loadCompleted) return;
+  const realPct = (loadedCount / totalCount) * 100;
   const elapsed = performance.now() - loadStartTime;
-  const timePct = Math.min(100, Math.round((elapsed / MIN_LOAD_MS) * 100));
+  const timePct = Math.min(100, (elapsed / MIN_LOAD_MS) * 100);
   const shown = Math.min(realPct, timePct);
-  loaderStatus.textContent = `LOADING ${shown}%`;
+  loaderStatus.textContent = `LOADING ${Math.round(shown)}%`;
   /* 円環の代わりに、COMMON／タグラインの文字が進捗に応じて
      1文字ずつ霧の中から像を結んでいく */
-  const p = shown / 100;
-  revealChars(brandChars, p);
-  revealChars(taglineChars, p);
+  revealChars(brandChars, shown / 100);
+  revealChars(taglineChars, shown / 100);
   /* 以前は全パネル画像（写真・コラージュ、200枚以上）を含む panelPending===0 まで
      待たせていたが、これが初回訪問者を最も長く足止めする箇所だった。
      3D空間の構造（モデル＋配置）さえ整えば旅は始められ、写真は各情景に
      近づく間にバックグラウンドで届いて距離ベースのopacityでフェードインする
      （updateArtworksが元々そう作られている）ので、待たずに入って問題ない */
   if (loadedCount >= totalCount && sceneReady && elapsed >= MIN_LOAD_MS) {
-    clearInterval(loadTick);
+    loadCompleted = true;
     loaderStatus.textContent = "READY";
     revealChars(brandChars, 1);
     revealChars(taglineChars, 1);
@@ -4065,7 +4072,7 @@ const loadTick = setInterval(() => {
       });
     }
   }
-}, 150);
+}
 
 enterBtn.addEventListener("click", () => {
   loader.classList.add("is-hidden");
@@ -4618,6 +4625,7 @@ renderer.setAnimationLoop(() => {
       4.7 + Math.cos(t * 0.3) * 0.05 * macroAmp
     );
     camera.lookAt(HERO_HEAD);
+    updateLoadProgress();
   }
 
   updateFluff(t, dt);
