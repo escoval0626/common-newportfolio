@@ -2142,6 +2142,30 @@ if (loaderFluffRenderer) {
 fluff.position.copy(HERO_HEAD);
 AREAS.forEach((ar) => { ar.currentW = 0; });
 
+/* エリアの build() は、そのエリアのコラージュ絵（assets/scenes、1枚あたり
+   0.5〜1.7MB）の取得を始める副作用を持つ。旅は一本道で、いま居る場所と
+   その前後しか視界に入らないため、必要になったものだけ組む。
+   t昇順（旅の順番）に並べた buildOrder を Promise.all 側で用意する */
+let buildOrder = [];
+function ensureAreaBuilt(area) {
+  if (!area || area._built) return;
+  area._built = true;
+  perf("build:" + area.name, () => area.build());
+}
+/* 指定した進行度の周辺を組む。手前に1つ残すのは、逆走（戻る）でも
+   空白を出さないため。ahead は進行方向の先読み数 */
+function ensureAreasAround(t, ahead = 1) {
+  if (!buildOrder.length) return;
+  let idx = 0, best = Infinity;
+  for (let i = 0; i < buildOrder.length; i++) {
+    const d = Math.abs(buildOrder[i].t - t);
+    if (d < best) { best = d; idx = i; }
+  }
+  for (let i = Math.max(0, idx - 1); i <= Math.min(buildOrder.length - 1, idx + ahead); i++) {
+    ensureAreaBuilt(buildOrder[i]);
+  }
+}
+
 /* 全読込→シーン構築 */
 Promise.all(
   Object.entries(MODELS).map(([k, u]) => loadModel(k, u))
@@ -2154,20 +2178,20 @@ Promise.all(
      間隔を空けて組み立て、最初の2エリア分が組み上がった時点でENTERを
      解禁する（残りは背景で追いつく。詩コピー等のDOM要素やホットスポットは
      別途モジュール読み込み時に用意済みなので、旅の進行自体は妨げない） */
-  const buildOrder = [...AREAS].sort((a, b) => a.t - b.t);
-  let builtCount = 0;
-  function buildNextArea() {
-    if (builtCount >= buildOrder.length) return;
-    perf("build:" + buildOrder[builtCount].name, () => buildOrder[builtCount].build());
-    builtCount++;
-    if (builtCount === 2) {
-      /* 綿毛はローディング開始時点で既に生成・浮遊させてある（上記参照）。
-         ここではENTERの解禁だけを行う */
-      sceneReady = true; /* パネル画像の非同期ロードはこの後 panelPending で待つ */
-    }
-    if (builtCount < buildOrder.length) setTimeout(buildNextArea, 180);
-  }
-  buildNextArea();
+  /* 以前は180ms間隔で全8エリアを順に組んでいたため、READYの1秒強あとには
+     まだ訪れてもいない情景を含む12枚すべての取得が始まっていた。
+     旅は一本道で、いま居る場所とその前後しか視界に入らないので、
+     必要になった範囲だけ組む（ensureAreasAround）。
+     絵が間に合わず空白が出ないよう、進行方向に1つ先まで先回りし、
+     ドットやCONTACTでの瞬間移動時は移動先を即座に組む（warpTo参照） */
+  buildOrder = [...AREAS].sort((a, b) => a.t - b.t);
+  /* 冒頭の2つ（ABOUT・PLANTS）はENTER直後に視界へ入るので先に組む。
+     ここまで揃った時点でENTERを解禁する */
+  ensureAreaBuilt(buildOrder[0]);
+  ensureAreaBuilt(buildOrder[1]);
+  /* 綿毛はローディング開始時点で既に生成・浮遊させてある（上記参照）。
+     ここではENTERの解禁だけを行う */
+  sceneReady = true; /* パネル画像の非同期ロードはこの後 panelPending で待つ */
 });
 
 /* 一人称視点で移動する3D空間＋常時揺れるカメラは、前庭障害・片頭痛・
@@ -3614,6 +3638,7 @@ if (DEV_TOOLS_ALLOWED && new URLSearchParams(location.search).get("debug") === "
     openGallery, closeGallery: () => closeGallery(), AREAS,
     camera, scene, THREE,
     rig, updateRoom, artworks,
+    ensureAreasAround, get buildOrder() { return buildOrder; },
     /* 実際に画面へ描かれている量を数える。推測で軽くしても意味がないので */
     stats() {
       let pts = 0, drawn = 0, objs = 0;
@@ -4098,6 +4123,9 @@ function warpTo(targetT) {
   if (galleryOpen) closeGallery(true); /* 逆再生の巻き戻りを見せず、即座に閉じる */
   rig.started = true;
   rig.lastInput = performance.now();
+  /* 瞬間移動なので、通常の「1つ先を先読み」では間に合わない。
+     ヴェールが降りている0.42秒のあいだに移動先を組んでおく */
+  ensureAreasAround(targetT, 1);
   gsap.timeline()
     .to(jumpVeil, { opacity: 1, duration: 0.42, ease: "power2.in" })
     .add(() => {
@@ -4240,6 +4268,9 @@ enterBtn.addEventListener("click", () => {
     const shared = hashName && AREAS.find((a) => a.name.toLowerCase() === hashName);
     if (shared) {
       rig.started = true;
+      /* 共有リンクは progress を直接その場へ置くため、毎フレームの
+         先読みでは間に合わない。着地点を先に組んでおく */
+      ensureAreasAround(shared.t, 1);
       rig.progress = shared.t;
       rig.target = shared.t;
       rig.veil = 0.85;
@@ -4744,6 +4775,9 @@ renderer.setAnimationLoop(() => {
 
   if (rig.entered) {
     softSnap(dt);
+    /* 進行先のエリアを先回りして組む。rig.target（目的地）を基準にすると
+       スクロール中も1つ先が常に用意され、着く頃には絵が届いている */
+    ensureAreasAround(rig.target, 1);
     const { capArea, capW } = updateCamera(dt);
     updateHud(capArea, capW);
   } else {
