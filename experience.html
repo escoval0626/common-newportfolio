@@ -14,6 +14,9 @@
        サイトなのかが読み取れなかった） -->
   <meta name="description" content="一粒の綿毛を追って、七つの情景を巡る。写真家・北郷将のインタラクティブ・ポートフォリオ。 / An interactive 3D portfolio by photographer Sho Kitago — follow a single dandelion seed through seven quiet scenes." />
   <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
+  <!-- デプロイ実物とコミットの対応を本番ページから確認できるようにする
+       (build-stamp.cjs がVercelのビルド時に置換する。ローカルではlocalのまま) -->
+  <meta name="build-sha" content="__BUILD_SHA__" />
   <link rel="canonical" href="https://www.commonphotograph.com/" />
 
   <!-- OGP / Twitter Card -->
