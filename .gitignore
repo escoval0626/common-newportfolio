@@ -18,3 +18,4 @@ assets/scenes/*.png
 # OS/エディタ
 .DS_Store
 Thumbs.db
+assets/scenes.backup/

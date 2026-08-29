@@ -598,9 +598,20 @@ const panels = [];
 let panelPending = 0;
 let sceneReady = false;
 
+/* 情景のコラージュ絵12枚は合計11.8MBあり、初期ダウンロードの過半を
+   占めていた（実測18.7MBのうち）。透過付きのwebpで、品質を落としても
+   4%しか縮まない一方、解像度を800px幅に落とすと50%減る。
+   モバイルは画面幅375〜430pxで、3D空間に映る大きさも画面幅どまりなので
+   800pxあれば高DPIでも足りる。デスクトップは原寸のままにして画質を
+   落とさない（assets/scenes/m/ に軽量版を置いてある） */
+const USE_LIGHT_SCENES = matchMedia("(max-width: 767px)").matches;
+function sceneUrl(url) {
+  return USE_LIGHT_SCENES ? url.replace("assets/scenes/", "assets/scenes/m/") : url;
+}
+
 function loadSceneTex(url) {
   panelPending++;
-  const t = texLoader.load(url, () => { panelPending--; }, undefined, () => { panelPending--; });
+  const t = texLoader.load(sceneUrl(url), () => { panelPending--; }, undefined, () => { panelPending--; });
   t.colorSpace = THREE.SRGBColorSpace;
   return t;
 }
@@ -811,6 +822,11 @@ function buildDustSync(rec, group, imageUrl, aspect, count, lineUrl, done) {
 /* 情景画像をピクセルサンプリングして、パネルと同じ面に点描を敷く。
    ローカル座標（plane は 1 × aspect）で配置し、group のスケールに乗る。 */
 function addSceneDust(rec, group, imageUrl, aspect, count, lineUrl) {
+  /* 粒子生成では 340x227 まで縮めてサンプリングするだけなので、
+     モバイルでは軽量版（800px幅）で十分。テクスチャ側と同じURLに
+     揃えることで、ブラウザのキャッシュも共有できる */
+  imageUrl = sceneUrl(imageUrl);
+  if (lineUrl) lineUrl = sceneUrl(lineUrl);
   panelPending++;
   let settled = false;
   const done = () => { if (!settled) { settled = true; panelPending--; } };
@@ -2052,14 +2068,23 @@ function buildStaticGallery() {
       section.appendChild(p);
     }
     const ul = document.createElement("ul");
+    /* ここは検索エンジンとスクリーンリーダー向けの代替表現で、画面には
+       .sr-only で隠してある（WebGLが使えない環境では手前で throw して
+       #webglFallback に切り替わるので、この関数が動くのは3D体験が
+       見られる環境だけ）。
+       以前は <img loading="lazy"> を98枚並べていたが、.sr-only は
+       1x1px に全要素が重なるため、ブラウザは「すべてビューポート内」と
+       判定して遅延読み込みが働かず、ENTER前に98枚・41.4MBを丸ごと
+       ダウンロードしていた（実測）。3Dで見せる環境では一枚も表示されない
+       画像なので、リンクとキャプションだけに置き換える。
+       クローラーには画像URLがリンクとして残り、読み上げにも影響しない */
     area.photos.forEach(([url, cap], i) => {
       const li = document.createElement("li");
       const fig = document.createElement("figure");
-      const img = document.createElement("img");
-      img.src = url;
-      img.alt = cap || `${area.name} ${i + 1}`;
-      img.loading = "lazy";
-      fig.appendChild(img);
+      const a = document.createElement("a");
+      a.href = url;
+      a.textContent = cap || `${area.name} ${i + 1}`;
+      fig.appendChild(a);
       if (cap) {
         const figcap = document.createElement("figcaption");
         figcap.textContent = cap;
