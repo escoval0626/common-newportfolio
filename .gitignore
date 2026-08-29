@@ -19,3 +19,4 @@ assets/scenes/*.png
 .DS_Store
 Thumbs.db
 assets/scenes.backup/
+node_modules/
