@@ -925,6 +925,32 @@
        display:noneはアクセシビリティツリーからも除外されてしまうため使わない。
        標準的な"sr-only"パターン（1pxに畳んでoverflowで切る）で、
        レイアウトにもフォーカス順にも影響を与えず存在させる ===== */
+    /* JS無効時の代替表示。canvasやloaderに隠されないよう最前面に置き、
+       紙の色と本編のタイポグラフィをそのまま使って世界観を保つ */
+    .noscript-fallback {
+      position: fixed; inset: 0; z-index: 200; overflow-y: auto;
+      background: var(--bg); color: var(--ink);
+      padding: calc(48px + env(safe-area-inset-top, 0px)) clamp(24px, 6vw, 72px)
+               calc(48px + env(safe-area-inset-bottom, 0px));
+      font-family: var(--font-latin); font-weight: 300; line-height: 1.9;
+    }
+    .noscript-fallback__brand { font-size: 12px; letter-spacing: 0.4em; color: var(--ink-dim); margin: 0 0 28px; }
+    .noscript-fallback__title {
+      font-family: var(--font-display); font-style: italic; font-weight: 300;
+      font-size: clamp(30px, 5.5vw, 48px); letter-spacing: 0.02em; margin: 0 0 24px;
+    }
+    .noscript-fallback__msg { font-size: 13px; letter-spacing: 0.06em; color: var(--ink-mid); margin: 0 0 28px; }
+    .noscript-fallback__bio {
+      font-family: var(--font-jp); font-size: 13px; letter-spacing: 0.08em;
+      color: var(--ink-mid); max-width: 40em; margin: 0 0 32px;
+    }
+    .noscript-fallback__series { list-style: none; padding: 0; margin: 0 0 32px; }
+    .noscript-fallback__series li {
+      font-family: var(--font-jp); font-size: 12px; letter-spacing: 0.08em;
+      color: var(--ink-mid); padding: 7px 0; border-bottom: 1px solid var(--line);
+    }
+    .noscript-fallback__links { font-size: 13px; letter-spacing: 0.08em; }
+    .noscript-fallback__links a { color: var(--ink); text-underline-offset: 4px; }
     .sr-only {
       position: absolute; width: 1px; height: 1px;
       padding: 0; margin: -1px; overflow: hidden;
@@ -933,6 +959,37 @@
   </style>
 </head>
 <body>
+
+  <!-- JavaScriptが無効・失敗した場合、これまでは画面が白いままで、
+       作品にも連絡先にも一切たどり着けなかった。WebGL非対応時の
+       #webglFallback と同じ情報を、スクリプトなしで到達できる形に置く。
+       検索エンジンにも、JS実行前の素のHTMLとして読める -->
+  <noscript>
+    <div class="noscript-fallback">
+      <p class="noscript-fallback__brand">COMMON<sup>©</sup></p>
+      <h1 class="noscript-fallback__title">Sho Kitago — Photographer</h1>
+      <p class="noscript-fallback__msg">
+        この体験はJavaScriptとWebGLで動いています。お使いの環境では表示できないため、
+        概要と連絡先をこちらに掲載しています。<br />
+        <span lang="en">This experience requires JavaScript. A summary and contact details are shown below.</span>
+      </p>
+      <p class="noscript-fallback__bio">COMMON は、北郷 将による写真プロジェクト。千葉県流山市を拠点に、日常の中でふと立ち止まりたくなるような光や余白、ざらついた静けさを記録しています。オールドレンズを通して、都市と生活のすきまにある見過ごされがちな瞬間を抽象的にすくい取ろうとしています。</p>
+      <ul class="noscript-fallback__series">
+        <li>PLANTS — 最も静かな被写体、最も雄弁な生命。</li>
+        <li>LANDSCAPES — 誰もいない場所にだけ、風景は現れる。</li>
+        <li>ARCHITECTURES — 直線の中に、人の祈りを探す。</li>
+        <li>SNAPS — 街の雑踏に、一瞬だけ立ち止まる光がある。</li>
+        <li>ABSTRACTS — 輪郭がほどけていく先に、本当の形がある。</li>
+        <li>EXHIBITIONS — 見せることは、選び、手放すこと。</li>
+      </ul>
+      <p class="noscript-fallback__links">
+        <a href="mailto:escoval0626@gmail.com">お問い合わせ — escoval0626@gmail.com</a><br />
+        <a href="https://www.instagram.com/common_ordinarydays/" rel="noopener noreferrer">Instagram</a>
+        ・
+        <a href="https://note.com/common0626" rel="noopener noreferrer">note</a>
+      </p>
+    </div>
+  </noscript>
 
   <canvas class="xp-canvas" id="xpCanvas"></canvas>
   <!-- 綿毛（旅の主役）だけを描く専用canvas。ローディング中は
