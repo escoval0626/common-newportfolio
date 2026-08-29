@@ -76,7 +76,10 @@
       --bg: #f7f6f2;
       --ink: #1c1c1c;
       --ink-mid: #55534e;
-      --ink-dim: #97948d;
+      /* #97948d はコントラスト比 2.64:1 でWCAG AAに届かず、タグライン
+         「ONE SEED, MANY JOURNEYS」や進捗表示など実情報にも使っていた。
+         4.62:1 になる値へ。見た目のトーンはほぼ変わらない */
+      --ink-dim: #6f6b63;
       --line: #e0dedb;
       --font-latin: "Josefin Sans", sans-serif;
       --font-jp: "Zen Old Mincho", serif;
@@ -158,14 +161,14 @@
     /* ===== 1枚を選んで見る時の見出し。誌面の扉のように、罫と余白で組む ===== */
     .zoom-cap {
       position: fixed; z-index: 9; pointer-events: none;
-      left: clamp(28px, 6vw, 88px); bottom: clamp(30px, 7vh, 74px);
+      left: calc(clamp(28px, 6vw, 88px) + env(safe-area-inset-left, 0px)); bottom: calc(clamp(30px, 7vh, 74px) + env(safe-area-inset-bottom, 0px));
       opacity: 0;
     }
     /* 明示的な閉じるボタン。これまでEscキーだけが頼りで、キーボード操作に
        不慣れな人・物理キーボードの無い環境では拡大表示から抜け出す手段が
        事実上無かった */
     .zoom-close {
-      position: fixed; z-index: 62; top: clamp(20px, 4vh, 32px); right: clamp(20px, 4vw, 56px);
+      position: fixed; z-index: 62; top: calc(clamp(20px, 4vh, 32px) + env(safe-area-inset-top, 0px)); right: calc(clamp(20px, 4vw, 56px) + env(safe-area-inset-right, 0px));
       width: 44px; height: 44px; border-radius: 50%;
       border: 1px solid var(--ink-dim); background: rgba(247, 246, 242, 0.65);
       color: var(--ink-mid); display: flex; align-items: center; justify-content: center;
@@ -383,7 +386,7 @@
       position: relative;
       margin-top: 8px;
       background: none;
-      border: none; padding: 10px 0;
+      border: none; padding: 12px 0; /* 当たり判定を44px以上にする（10pxだと実測42px） */
       cursor: pointer; pointer-events: none;
     }
     .loader__enter.is-ready { pointer-events: auto; }
@@ -482,9 +485,9 @@
        10px前後しかなく、指で正確に狙いづらい。見た目を変えずに
        疑似要素で当たり判定だけをWCAG目安の44px角に近づける */
     .hud__logo::before, .hud__back::before, .hud__contact::before {
-      /* -15px だと CONTACT（文字高11px）の当たり判定が42pxで、目安の44pxに
-         わずかに届かなかった。実測して -16px に詰めてある */
-      content: ""; position: absolute; inset: -16px -8px;
+      /* 文字高11pxに対し -16px では 11+32=43px（実測42px）にしかならず、
+         目安の44pxに届いていなかった。elementFromPointで測り直して -17px */
+      content: ""; position: absolute; inset: -17px -8px;
     }
     .hud__contact.is-hidden { opacity: 0; pointer-events: none; }
     /* SNS：細い線の円だけの控えめなアイコン。常時表示 */
@@ -548,7 +551,7 @@
     .hud__hint__br { display: none; }
 
     .hud__progressbar {
-      position: absolute; left: 0; bottom: 0; height: 2px; width: 100%;
+      position: absolute; left: 0; bottom: env(safe-area-inset-bottom, 0px); height: 2px; width: 100%;
       background: var(--line);
     }
     .hud__progressbar span { display: block; height: 100%; width: 0%; background: var(--ink); }
@@ -770,13 +773,13 @@
     /* ===== クレジット（CC-BY表記） ===== */
     .hud__credits {
       position: absolute; right: calc(clamp(18px, 3vw, 44px) + env(safe-area-inset-right, 0px)); bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-      font-size: 8px; letter-spacing: 0.14em; color: var(--ink-dim);
+      font-size: 10px; letter-spacing: 0.14em; color: var(--ink-dim);
       opacity: 0.75; transition: opacity 0.3s;
     }
 
     /* ===== 波線スクロールインジケーター ===== */
     .hud__wave {
-      position: absolute; left: 50%; bottom: 44px; transform: translateX(-50%);
+      position: absolute; left: 50%; bottom: calc(44px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
       width: 46px; height: 14px; overflow: hidden; opacity: 0.7;
       transition: opacity 0.3s;
     }
@@ -843,14 +846,25 @@
       /* hint が2行（34px）になると上端が波線（bottom:44px、上端58px）に
          達して重なるため、波線をさらに上へ逃がす。hint が1行の時は
          余白が少し増えるだけで実害はない */
-      .hud__wave { bottom: 64px; }
+      /* タッチ環境ではJSがhintを1行(高さ17px)に差し替えるため、2行前提の64pxは
+         過剰だった。hint上端(26+17=43px)の上に載る位置へ。safe-areaも同じ基準で足す */
+      .hud__wave { bottom: calc(50px + env(safe-area-inset-bottom, 0px)); }
+      /* 作品キャプションは左下、ヒントと波線は中央下。デスクトップでは横に
+         離れているが、375px幅では作品名（"White Yarrow, Meadow"等）が2行に
+         なって中央まで伸び、波線が文字の上に完全に乗っていた（実測46x14px）。
+         横方向で分離できない以上、モバイルでは縦に積む。
+         下から ヒント(26〜43px) → 波線(50〜64px) → キャプション(78px〜) */
+      .hud__caption { bottom: calc(78px + env(safe-area-inset-bottom, 0px)); }
 
       /* ロゴ＋「← BACK TO JOURNEY」＋SNSの合計が画面幅を46px超え、
          ロゴへ詰まって重なって見えたりSNSが画面外に押し出されていた。
          レターイングを詰めて幅を作る */
       .hud__head { padding: calc(20px + env(safe-area-inset-top, 0px)) calc(10px + env(safe-area-inset-right, 0px)) 20px calc(10px + env(safe-area-inset-left, 0px)); }
       .hud__logo { font-size: 12px; letter-spacing: 0.1em; }
-      .hud__head-right { gap: 5px; }
+      /* CONTACTの当たり判定(::beforeで右へ8px張り出す)がgap:5pxを食い潰し、
+         Instagramと隙間なく隣接していた。押し間違えると外部サイトへ飛ぶため、
+         張り出し分を上回る間隔を確保する */
+      .hud__head-right { gap: 16px; }
       .hud__back { font-size: 9.5px; letter-spacing: 0.12em; }
       /* 以前はCONTACTを8pxまで潰して幅超過を回避していたが、視認性の
          犠牲が大きすぎた（真因は隣の .hud__back — 非表示時も

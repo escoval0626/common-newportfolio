@@ -4126,16 +4126,19 @@ let loadCompleted = false;
    判定だけ。以前はここでrevealChars／GSAPを毎フレーム駆動していたが、
    ローディング中はaddSceneDustがメインスレッドを最長1.7秒ブロックする
    ため、rAF駆動では演出そのものが固まっていた。
-   表示用の進捗も、実進捗（loadedCount/totalCount）だと5モデルの完了が
-   不揃いで0→20→40…と階段状に飛ぶため、経過時間ベースの一定カーブに
-   固定し、実際の読み込み状況は「先に進んでよいか」のゲートとしてのみ
-   使う（読み込みがまだなら99%で足踏みし、100%には到達させない） */
+   表示用の進捗は、実進捗（loadedCount/totalCount）だけに任せると5モデルの
+   完了が不揃いで0→20→40…と階段状に飛ぶ。かといって経過時間だけに固定して
+   99%で足踏みさせると、回線の遅い実機では「LOADING 99%」のまま十数秒
+   止まって見え、正直なバーより体感が悪くなる（ADレビューでの指摘）。
+   そこで両者の低い方を採って、実進捗を上限としつつ時間で滑らかに近づける。
+   実進捗が伸びれば表示も伸び、止まっていれば手前で待つ。数字は嘘をつかない */
 function updateLoadProgress() {
   if (loadCompleted) return;
   const loaded = loadedCount >= totalCount && sceneReady;
   const elapsed = performance.now() - loadStartTime;
-  const cap = loaded ? 100 : 99;
-  const shown = Math.min(cap, (elapsed / MIN_LOAD_MS) * 100);
+  const realPct = (loadedCount / totalCount) * 100;
+  const timePct = (elapsed / MIN_LOAD_MS) * 100;
+  const shown = loaded ? Math.min(100, timePct) : Math.min(realPct, timePct);
   loaderStatus.textContent = `LOADING ${Math.round(shown)}%`;
   /* 以前は全パネル画像（写真・コラージュ、200枚以上）を含む panelPending===0 まで
      待たせていたが、これが初回訪問者を最も長く足止めする箇所だった。
