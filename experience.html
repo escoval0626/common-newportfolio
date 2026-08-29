@@ -2,7 +2,11 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- viewport-fit=cover でノッチ／ホームインジケータの下まで描画を広げ、
+       3D空間を画面の端まで見せる。UI側は env(safe-area-inset-*) を各余白へ
+       加算して避ける（非対応環境では 0px にフォールバックするので、
+       デスクトップ・Androidの見え方は一切変わらない） -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Common — Sho Kitago</title>
   <!-- 説明文は日英併記。国内の閲覧者に加えて、海外からの流入・
        SNSカード・海外ギャラリーサイトの審査でも中身が伝わるようにする
@@ -438,7 +442,7 @@
     .hud__head {
       position: absolute; top: 0; left: 0; right: 0;
       display: flex; justify-content: space-between; align-items: center;
-      padding: 24px clamp(20px, 4vw, 56px);
+      padding: calc(24px + env(safe-area-inset-top, 0px)) calc(clamp(20px, 4vw, 56px) + env(safe-area-inset-right, 0px)) 24px calc(clamp(20px, 4vw, 56px) + env(safe-area-inset-left, 0px));
     }
     .hud__logo {
       position: relative;
@@ -478,7 +482,9 @@
        10px前後しかなく、指で正確に狙いづらい。見た目を変えずに
        疑似要素で当たり判定だけをWCAG目安の44px角に近づける */
     .hud__logo::before, .hud__back::before, .hud__contact::before {
-      content: ""; position: absolute; inset: -15px -8px;
+      /* -15px だと CONTACT（文字高11px）の当たり判定が42pxで、目安の44pxに
+         わずかに届かなかった。実測して -16px に詰めてある */
+      content: ""; position: absolute; inset: -16px -8px;
     }
     .hud__contact.is-hidden { opacity: 0; pointer-events: none; }
     /* SNS：細い線の円だけの控えめなアイコン。常時表示 */
@@ -495,7 +501,7 @@
     .hud__social-link--note { font-family: var(--font-display); font-style: italic; font-size: 13px; line-height: 1; }
 
     .hud__caption {
-      position: absolute; left: clamp(20px, 4vw, 56px); bottom: clamp(24px, 6vh, 60px);
+      position: absolute; left: calc(clamp(20px, 4vw, 56px) + env(safe-area-inset-left, 0px)); bottom: calc(clamp(24px, 6vh, 60px) + env(safe-area-inset-bottom, 0px));
       opacity: 0; transform: translateY(14px);
       transition: opacity 0.7s ease, transform 0.7s ease;
     }
@@ -505,7 +511,7 @@
 
     /* 進行ドット（クリックでそのエリアへ滑走） */
     .hud__dots {
-      position: absolute; right: clamp(18px, 3vw, 44px); top: 50%; transform: translateY(-50%);
+      position: absolute; right: calc(clamp(18px, 3vw, 44px) + env(safe-area-inset-right, 0px)); top: 50%; transform: translateY(-50%);
       display: flex; flex-direction: column; gap: 18px; pointer-events: auto;
     }
     .hud__dot {
@@ -529,7 +535,7 @@
     .hud__dot-wrap:hover .hud__dot-label { opacity: 1; transform: translateY(-50%) translateX(0); }
 
     .hud__hint {
-      position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%);
+      position: absolute; left: 50%; bottom: calc(26px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
       font-size: 12px; letter-spacing: 0.32em; color: var(--ink-mid);
       transition: opacity 1s;
       /* absolute配置＋幅指定なしの複数行テキストは shrink-to-fit の
@@ -763,7 +769,7 @@
 
     /* ===== クレジット（CC-BY表記） ===== */
     .hud__credits {
-      position: absolute; right: clamp(18px, 3vw, 44px); bottom: 12px;
+      position: absolute; right: calc(clamp(18px, 3vw, 44px) + env(safe-area-inset-right, 0px)); bottom: calc(12px + env(safe-area-inset-bottom, 0px));
       font-size: 8px; letter-spacing: 0.14em; color: var(--ink-dim);
       opacity: 0.75; transition: opacity 0.3s;
     }
@@ -842,7 +848,7 @@
       /* ロゴ＋「← BACK TO JOURNEY」＋SNSの合計が画面幅を46px超え、
          ロゴへ詰まって重なって見えたりSNSが画面外に押し出されていた。
          レターイングを詰めて幅を作る */
-      .hud__head { padding: 20px 10px; }
+      .hud__head { padding: calc(20px + env(safe-area-inset-top, 0px)) calc(10px + env(safe-area-inset-right, 0px)) 20px calc(10px + env(safe-area-inset-left, 0px)); }
       .hud__logo { font-size: 12px; letter-spacing: 0.1em; }
       .hud__head-right { gap: 5px; }
       .hud__back { font-size: 9.5px; letter-spacing: 0.12em; }
