@@ -577,7 +577,12 @@
       background: none; border: 0; padding: 0; margin: 0;
       font-family: var(--font-latin); font-size: 13px; letter-spacing: 0.16em;
       color: #2a2620; white-space: nowrap;
-      cursor: pointer; pointer-events: auto;
+      cursor: pointer;
+      /* 3D空間へ投影される前は原点(0,0)に居るため、透明なまま
+         pointer-events:auto だと画面左上に見えないクリック領域が
+         できてしまう（実測327x22px、上端の横87%を覆っていた）。
+         見えている間だけ反応させる */
+      pointer-events: none;
       opacity: 0;
       text-shadow: 0 0 6px #f2efe8, 0 0 10px #f2efe8;
       will-change: transform, filter, opacity;
@@ -777,7 +782,10 @@
     .hud__credits {
       position: absolute; right: calc(clamp(18px, 3vw, 44px) + env(safe-area-inset-right, 0px)); bottom: calc(12px + env(safe-area-inset-bottom, 0px));
       font-size: 10px; letter-spacing: 0.14em; color: var(--ink-dim);
-      opacity: 0.75; transition: opacity 0.3s;
+      /* --ink-dim を 4.62:1 まで上げたのに opacity:0.75 が掛かって
+         実効2.92:1 まで落ち、10pxの本文としてAA(4.5:1)を割っていた。
+         濃度は色そのもので決める */
+      transition: opacity 0.3s;
     }
 
     /* ===== 波線スクロールインジケーター ===== */
@@ -1075,6 +1083,9 @@
   <div class="hero-title" id="heroTitle">
     <h1 class="hero-title__mark"><em>Common</em></h1>
 
+    <p class="hero-title__sub">Portfolio — Sho Kitago</p>
+  </div>
+
   <!-- 検索エンジンとスクリーンリーダー向けの作品一覧（.sr-onlyで視覚的には非表示）。
        H1より前に置くと98件のリンクとH2群がサイト見出しより先に読まれてしまうため、
        hero H1の直後に配置している -->
@@ -1083,8 +1094,6 @@
        向けに、同じ作品・キャプションを通常のHTMLとしてここに用意する。
        中身はexperience.js（buildStaticGallery）がAREASのデータから生成する -->
   <main id="staticGallery" class="sr-only" aria-label="作品一覧"></main>
-    <p class="hero-title__sub">Portfolio — Sho Kitago</p>
-  </div>
 
   <!-- LOADER -->
   <!-- ローディング画面は「幕」ではなく、旅立つ前の霧。

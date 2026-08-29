@@ -2098,6 +2098,13 @@ function buildStaticGallery() {
       const a = document.createElement("a");
       a.href = url;
       a.textContent = cap || `${area.name} ${i + 1}`;
+      /* Tab順からは外す。ここは検索エンジンとスクリーンリーダー向けの
+         代替表現で、視覚的には .sr-only で隠れている。フォーカス可能な
+         ままだと98個のリンクがENTERより前に並び、キーボードだけの
+         訪問者はTabを99回押さないと入場できなかった（ADレビュー実測で
+         ENTERはタブ順100番目）。読み上げとクローラーの用途は
+         tabindex=-1 でも損なわれない */
+      a.tabIndex = -1;
       fig.appendChild(a);
       if (cap) {
         const figcap = document.createElement("figcaption");
