@@ -51,7 +51,11 @@ Three.js のリビジョンは `vendor/three/three.module.js` 内の
 リポジトリ直下の `sync-vendor.cjs` が、取得・配置・依存チェック・
 このREADMEのバージョン表更新までまとめて行う。
 
-
+```bash
+# 1. sync-vendor.cjs 冒頭の THREE_VERSION / GSAP_VERSION を書き換える
+# 2. 実行するだけ
+node sync-vendor.cjs
+```
 
 依存が増えていた場合はその場で検出して停止するので、コピー漏れのまま
 公開してしまう事故が起きない。
