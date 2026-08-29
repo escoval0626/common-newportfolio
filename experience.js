@@ -1960,7 +1960,10 @@ const AREAS = [
     hotspot: "escoval0626@gmail.com — Say hello",
     link: "mailto:escoval0626@gmail.com",
     email: "escoval0626@gmail.com",
-    lines: ["旅の終わりに、", "また、種が降りる。"],
+    /* 「種が降りる」で終わると、詩的な着地の隣にいきなりメールアドレスが
+       並び、余韻と連絡という行為の間に橋が無かった（ADレビュー指摘）。
+       言い切らずに余白を残す一行を足して、静かなまま接続する */
+    lines: ["旅の終わりに、", "また、種が降りる。", "いつか、どこかで。"],
     /* 旅の終着：綿毛の種が地面に降りて散る。近づくほど、その種から
        二輪だけ花が咲く（冒頭のマクロの一輪と対になり、旅が円環で閉じる） */
     build() {
@@ -2588,7 +2591,7 @@ const COPY_EN = {
   SNAPS: "In the city's clamor, a light that pauses for an instant.",
   ABSTRACTS: "Past where the outline comes undone, the true shape waits.",
   EXHIBITIONS: "To show something is to choose, and to let go.",
-  CONTACT: "At the journey's end, a seed falls once more.",
+  CONTACT: "At the journey's end, a seed falls once more. Someday, somewhere.",
 };
 
 /* 縦組み＋英訳の"箱"は様式が強く、6回続くと飽きる。
@@ -3497,10 +3500,8 @@ function openZoom(mesh) {
      1枚を見ている間だけ退かせる */
   hint.classList.add("is-faded");
   const waveEl = document.querySelector(".hud__wave");
-  const creditsEl = document.querySelector(".hud__credits");
   const socialEl = document.querySelector(".hud__social");
   if (waveEl) waveEl.classList.add("is-zoom-hidden");
-  if (creditsEl) creditsEl.classList.add("is-zoom-hidden");
   /* SNSの円は閉じるボタンと重なる位置にあり、390px幅では実際に衝突して
      いた。閉じるつもりで外部サイトへ飛ぶ誤操作を防ぐため一緒に退場させる */
   if (socialEl) { socialEl.classList.add("is-zoom-hidden"); socialEl.inert = true; }
@@ -3569,10 +3570,8 @@ function closeZoom() {
      部屋自体を出る場合は、この直後に closeGallery が改めて隠す */
   hint.classList.remove("is-faded");
   const waveEl = document.querySelector(".hud__wave");
-  const creditsEl = document.querySelector(".hud__credits");
   const socialEl = document.querySelector(".hud__social");
   if (waveEl) waveEl.classList.remove("is-zoom-hidden");
-  if (creditsEl) creditsEl.classList.remove("is-zoom-hidden");
   if (socialEl) { socialEl.classList.remove("is-zoom-hidden"); socialEl.inert = false; }
   zoomCap.setAttribute("aria-modal", "false");
   zoomCap.setAttribute("aria-hidden", "true");

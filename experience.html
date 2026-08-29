@@ -779,14 +779,6 @@
     .webgl-fallback__link:hover { border-color: var(--ink); }
 
     /* ===== クレジット（CC-BY表記） ===== */
-    .hud__credits {
-      position: absolute; right: calc(clamp(18px, 3vw, 44px) + env(safe-area-inset-right, 0px)); bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-      font-size: 10px; letter-spacing: 0.14em; color: var(--ink-dim);
-      /* --ink-dim を 4.62:1 まで上げたのに opacity:0.75 が掛かって
-         実効2.92:1 まで落ち、10pxの本文としてAA(4.5:1)を割っていた。
-         濃度は色そのもので決める */
-      transition: opacity 0.3s;
-    }
 
     /* ===== 波線スクロールインジケーター ===== */
     .hud__wave {
@@ -796,7 +788,7 @@
     }
     /* 1枚を大きく見ている間、zoom-capと同じ下部領域を使う波線・クレジットを退かす。
        特にモバイル幅ではこれらが zoom-cap のテキストと重なって読めなくなっていた */
-    .hud__wave.is-zoom-hidden, .hud__credits.is-zoom-hidden { opacity: 0; }
+    .hud__wave.is-zoom-hidden { opacity: 0; }
     .hud__wave svg { display: block; animation: waveSlide 2.2s linear infinite; }
     @keyframes waveSlide { from { transform: translateX(0); } to { transform: translateX(-23px); } }
 
@@ -1155,7 +1147,6 @@
     </div>
     <div class="hud__dots" id="dots"></div>
     <p class="hud__hint" id="hint">SCROLL / DRAG — 綿毛を追う</p>
-    <p class="hud__credits">3D SCANS: POLY HAVEN (CC0)</p>
     <div class="hud__wave" aria-hidden="true">
       <svg width="92" height="14" viewBox="0 0 92 14" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M0 7 Q 5.75 0, 11.5 7 T 23 7 T 34.5 7 T 46 7 T 57.5 7 T 69 7 T 80.5 7 T 92 7" stroke="#55534e" stroke-width="1.4" fill="none"/>
