@@ -92,6 +92,14 @@ cp node_modules/gsap/index.js node_modules/gsap/gsap-core.js node_modules/gsap/C
    r160 → r16x でも `BufferGeometry` や `ShaderMaterial` の API が変わることがある。
    このプロジェクトは点群シェーダーを自作しているため影響を受けやすい。
 
+## 更新履歴
+
+sync-vendor.cjs が実行のたびに追記する。手で書き足す必要はない。
+
+| 日付 | Three.js | GSAP |
+|---|---|---|
+| 2026-08-29 | r160 (0.160.0) | 3.13.0 | ← 自前配信へ切り替え（初期導入）
+
 ## importmap との対応
 
 `experience.html` の importmap がここを指している。パスを変えるときは両方直す。

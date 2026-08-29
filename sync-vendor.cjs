@@ -89,18 +89,35 @@ if (unexpected.length) {
 }
 console.log("  → 想定内の依存のみ");
 
-console.log("\n[4/4] バージョン表記を vendor/README.md へ反映");
+console.log("\n[4/4] バージョン表記と更新履歴を vendor/README.md へ反映");
 const readmePath = "vendor/README.md";
 if (fs.existsSync(readmePath)) {
   let readme = fs.readFileSync(readmePath, "utf8");
   const rev = (fs.readFileSync("vendor/three/three.module.js", "utf8").match(/REVISION\s*=\s*'([^']+)'/) || [])[1];
+
+  /* 現在のバージョン表 */
   readme = readme.replace(
     /\| Three\.js \| \*\*[^*]+\*\*[^|]*\|/,
     `| Three.js | **r${rev}** (\`three@${THREE_VERSION}\`) |`
   );
   readme = readme.replace(/\| GSAP \| \*\*[^*]+\*\* \|/, `| GSAP | **${GSAP_VERSION}** |`);
+
+  /* 更新履歴。「いつ何から何へ上げたか」は手で書くと必ず忘れるので、
+     バージョンが変わったときだけ行を足す（同バージョンの再実行では
+     履歴を汚さない） */
+  const histHeader = "| 日付 | Three.js | GSAP |\n|---|---|---|\n";
+  if (readme.includes(histHeader)) {
+    const line = `| ${new Date().toISOString().slice(0, 10)} | r${rev} (${THREE_VERSION}) | ${GSAP_VERSION} |\n`;
+    const already = readme.includes(`| r${rev} (${THREE_VERSION}) | ${GSAP_VERSION} |`);
+    if (already) {
+      console.log("  → バージョン変更なし。履歴は追記しません");
+    } else {
+      readme = readme.replace(histHeader, histHeader + line);
+      console.log(`  → 履歴に追記: Three.js r${rev} / GSAP ${GSAP_VERSION}`);
+    }
+  }
   fs.writeFileSync(readmePath, readme);
-  console.log(`  → Three.js r${rev} / GSAP ${GSAP_VERSION}`);
+  console.log(`  → 現在: Three.js r${rev} / GSAP ${GSAP_VERSION}`);
 }
 
 console.log("\n完了。次に確認すること:");
