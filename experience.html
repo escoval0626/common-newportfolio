@@ -337,6 +337,10 @@
        ここで初めて「写真のポートフォリオである」ことを明示する */
     .loader__tagline {
       font-family: var(--font-latin); font-size: 12px; letter-spacing: 0.32em; color: var(--ink-dim);
+      /* 字間0.32emが全文字に均等に入るため、単語間のスペースが字間に
+         埋もれて ONESEED,MANYJOURNEYS と一語に見えていた。
+         単語の切れ目にだけ余分な間を足す */
+      word-spacing: 0.6em;
       margin-top: 2px;
       text-shadow: 0 0 8px #f7f6f2, 0 0 16px #f7f6f2, 0 0 4px #f7f6f2;
     }

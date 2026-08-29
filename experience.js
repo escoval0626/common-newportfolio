@@ -4084,7 +4084,16 @@ function splitChars(el, baseDelay, step) {
   const spans = [...text].map((ch, i) => {
     const span = document.createElement("span");
     span.className = "loader__char";
-    span.textContent = ch === " " ? " " : ch;
+    /* スペースも1文字ずつspanになるが、display:inline-block では
+       中身が空白だけの要素の幅が0に潰れ、word-spacing も単語境界と
+       見なされないため ONESEED,MANYJOURNEYS と一語に見えていた。
+       スペースの span にだけ実寸の幅を持たせる */
+    if (ch === " ") {
+      span.innerHTML = "&nbsp;";
+      span.style.width = "0.42em";
+    } else {
+      span.textContent = ch;
+    }
     /* 完全な等間隔だと機械的に見えるので、わずかな乱れを混ぜて
        不揃いに像を結ぶ有機的な間をつくる */
     span.style.animationDelay = `${(baseDelay + i * step + Math.random() * 0.05).toFixed(3)}s`;
