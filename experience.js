@@ -1050,9 +1050,20 @@ const P_CORE  = ["#8a7a5f", "#6f6248", "#9c8a6a"];   /* 花托・種 */
    GLBスキャン読み込み（Blender製アセット完成時はここに追加）
 ============================================================ */
 const loaderGLTF = new GLTFLoader();
+/* 実際に3D空間へ配置しているのは TRANSIT_OBJECTS（情景と情景のあいだに
+   立つ木立）だけで、そこで使うキーは deadtree と fern の2つ。
+   花の3件（gazania / heliophila / ursinia）は placeScan から一度も
+   参照されないまま、Promise.all で毎回ダウンロードされ、READYの判定
+   （loadedCount）にも数えられていた。実測で合計4.0MBの純粋な無駄。
+   パレット（PALETTES / WASH_BY_KEY）に名前だけ残してあるのは将来の
+   配置に備えたもので、アセット原本も消していない。使うときは
+   MODELS_DEFERRED から MODELS へ移すか、到達時のオンデマンド読み込みにする */
 const MODELS = {
   deadtree:   "assets/models/real/dead_tree_trunk/dead_tree_trunk_1k.gltf",
   fern:       "assets/models/real/fern_02/fern_02_1k.gltf",
+};
+/* 現状どこからも配置されていない。初期ロードには含めない */
+const MODELS_DEFERRED = {
   gazania:    "assets/models/real/flower_gazania/flower_gazania_1k.gltf",
   heliophila: "assets/models/real/flower_heliophila/flower_heliophila_1k.gltf",
   ursinia:    "assets/models/real/flower_ursinia/flower_ursinia_1k.gltf",

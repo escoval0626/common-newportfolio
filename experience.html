@@ -1146,12 +1146,18 @@
   <!-- 3D追従テキストレイヤー -->
   <div class="anchors" id="anchors"></div>
 
+  <!-- 以前はThree.js/GSAPをjsDelivrから読んでいたが、CDNが落ちる・遮断される
+       だけでサイト全体が起動しない単一障害点になっていた（体験の本体が
+       この2つに依存しているため、LOADING 0%のまま止まる）。
+       vendor/ に同じバージョンを置いて自前配信にし、CSPからも外部スクリプト
+       の許可を消せるようにした。使うaddonは5つだけなので、examples/jsm を
+       丸ごとではなく必要なファイルだけ置いてある -->
   <script type="importmap">
   {
     "imports": {
-      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
-      "gsap": "https://cdn.jsdelivr.net/npm/gsap@3.13.0/+esm"
+      "three": "./vendor/three/three.module.js",
+      "three/addons/": "./vendor/three/addons/",
+      "gsap": "./vendor/gsap/index.js"
     }
   }
   </script>

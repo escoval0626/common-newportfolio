@@ -85,11 +85,11 @@ http
             "X-Content-Type-Options": "nosniff",
             "Referrer-Policy": "strict-origin-when-cross-origin",
             "Content-Security-Policy":
-              "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'sha256-MyzGJLvLJiAK6ZRWs4iLCdum7R3YuhvvouXCROeMvDU='; " +
+              "default-src 'self'; script-src 'self' 'sha256-DUvCf3ZDxVUIiclj1oHIUUDBV2mFirPyDuVx+nBHjCc='; " +
               "worker-src 'self'; " +
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
               "font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; " +
-              "media-src 'self'; connect-src 'self' https://cdn.jsdelivr.net; " +
+              "media-src 'self'; connect-src 'self'; " +
               "object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
           });
           res.end(data);
