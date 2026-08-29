@@ -22,7 +22,10 @@ const canvas = document.getElementById("xpCanvas");
 /* ?perf=1 のときだけ、重い処理の所要時間を window.__perf に溜める。
    「どこがメインスレッドを止めているのか」を推測ではなく実測するための
    計測フック。本番では条件が偽なので関数呼び出し1回ぶんしか掛からない */
-const PERF = /[?&]perf=1\b/.test(location.search);
+/* ?perf=1 を付けるだけで本番URLでも window.__perf が公開できてしまっていた。
+   計測フックはローカル開発時だけ有効にする */
+const PERF = /[?&]perf=1\b/.test(location.search) &&
+  /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
 if (PERF) window.__perf = [];
 function perf(name, fn) {
   if (!PERF) return fn();
@@ -3464,8 +3467,12 @@ function openZoom(mesh) {
   hint.classList.add("is-faded");
   const waveEl = document.querySelector(".hud__wave");
   const creditsEl = document.querySelector(".hud__credits");
+  const socialEl = document.querySelector(".hud__social");
   if (waveEl) waveEl.classList.add("is-zoom-hidden");
   if (creditsEl) creditsEl.classList.add("is-zoom-hidden");
+  /* SNSの円は閉じるボタンと重なる位置にあり、390px幅では実際に衝突して
+     いた。閉じるつもりで外部サイトへ飛ぶ誤操作を防ぐため一緒に退場させる */
+  if (socialEl) { socialEl.classList.add("is-zoom-hidden"); socialEl.inert = true; }
   /* モーダルとして扱う：背景（HUD・3Dアンカー群）をinertにしてTabが
      抜けないようにし、閉じるボタンへフォーカスを移す */
   zoomCap.setAttribute("aria-modal", "true");
@@ -3532,8 +3539,10 @@ function closeZoom() {
   hint.classList.remove("is-faded");
   const waveEl = document.querySelector(".hud__wave");
   const creditsEl = document.querySelector(".hud__credits");
+  const socialEl = document.querySelector(".hud__social");
   if (waveEl) waveEl.classList.remove("is-zoom-hidden");
   if (creditsEl) creditsEl.classList.remove("is-zoom-hidden");
+  if (socialEl) { socialEl.classList.remove("is-zoom-hidden"); socialEl.inert = false; }
   zoomCap.setAttribute("aria-modal", "false");
   zoomCap.setAttribute("aria-hidden", "true");
   if (hud) hud.inert = false;

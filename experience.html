@@ -994,7 +994,9 @@
     </div>
   </noscript>
 
-  <canvas class="xp-canvas" id="xpCanvas"></canvas>
+  <!-- 3D描画は装飾で、作品の内容は #staticGallery（DOM）が代替表現として
+       持っている。canvasを読み上げても情報がないため支援技術から隠す -->
+  <canvas class="xp-canvas" id="xpCanvas" aria-hidden="true"></canvas>
   <!-- 綿毛（旅の主役）だけを描く専用canvas。ローディング中は
        「ローディングUI → 綿毛 → 霧のヴェール → タンポポ本体（xpCanvas）」
        という重なり順にしたいが、1枚のcanvasに全部まとめて描いている限り、
@@ -1003,12 +1005,7 @@
        別canvasに移してレンダリングし、.loaderより手前に重ねることで
        実現する（タンポポ本体は元のxpCanvasに残したまま＝霧の奥でよい）。
        ENTER後は綿毛を本編シーンへ戻し、このcanvasへの描画は止める -->
-  <canvas class="xp-canvas loader-fluff-canvas" id="loaderFluffCanvas"></canvas>
-  <!-- 3D体験は視覚演出であって、作品そのものの唯一の窓口ではない。
-       WebGLを解釈できない環境（スクリーンリーダー・検索エンジンのクローラー）
-       向けに、同じ作品・キャプションを通常のHTMLとしてここに用意する。
-       中身はexperience.js（buildStaticGallery）がAREASのデータから生成する -->
-  <main id="staticGallery" class="sr-only" aria-label="作品一覧"></main>
+  <canvas class="xp-canvas loader-fluff-canvas" id="loaderFluffCanvas" aria-hidden="true"></canvas>
   <!-- WebGL非対応・コンテキスト喪失時のフォールバック -->
   <!-- index.html（静的TOP）は実写真差し替え待ちで本番未公開のため、
        ここへの導線は必ず機能するmailtoにする。role/aria-hiddenはJS側
@@ -1077,6 +1074,15 @@
   <!-- ヒーロータイトル：ポートフォリオTOPのタイトル（冒頭で表示・スクロールで退場） -->
   <div class="hero-title" id="heroTitle">
     <h1 class="hero-title__mark"><em>Common</em></h1>
+
+  <!-- 検索エンジンとスクリーンリーダー向けの作品一覧（.sr-onlyで視覚的には非表示）。
+       H1より前に置くと98件のリンクとH2群がサイト見出しより先に読まれてしまうため、
+       hero H1の直後に配置している -->
+  <!-- 3D体験は視覚演出であって、作品そのものの唯一の窓口ではない。
+       WebGLを解釈できない環境（スクリーンリーダー・検索エンジンのクローラー）
+       向けに、同じ作品・キャプションを通常のHTMLとしてここに用意する。
+       中身はexperience.js（buildStaticGallery）がAREASのデータから生成する -->
+  <main id="staticGallery" class="sr-only" aria-label="作品一覧"></main>
     <p class="hero-title__sub">Portfolio — Sho Kitago</p>
   </div>
 
@@ -1113,7 +1119,9 @@
   <div class="jump-veil" id="jumpVeil"></div>
 
   <!-- HUD -->
-  <div class="hud" id="hud">
+  <!-- 情景の移動（ロゴ＝先頭へ / ドット＝各情景 / CONTACT）を担うので、
+       支援技術にもナビゲーションとして認識させる -->
+  <nav class="hud" id="hud" aria-label="情景のナビゲーション">
     <div class="hud__head">
       <button class="hud__logo" id="hudLogo" type="button" aria-label="旅の最初に戻る">COMMON<sup>©</sup></button>
       <div class="hud__head-right">
@@ -1133,7 +1141,8 @@
     </div>
     <div class="hud__caption" id="caption">
       <p class="hud__caption-num" id="captionNum"></p>
-      <h2 class="hud__caption-title" id="captionTitle"></h2>
+      <!-- 作品名が入るまでは空の見出しになるため、中身が入るまで隠す -->
+      <h2 class="hud__caption-title" id="captionTitle" aria-hidden="true"></h2>
     </div>
     <div class="hud__dots" id="dots"></div>
     <p class="hud__hint" id="hint">SCROLL / DRAG — 綿毛を追う</p>
@@ -1144,7 +1153,7 @@
       </svg>
     </div>
     <div class="hud__progressbar"><span id="progressBar"></span></div>
-  </div>
+  </nav>
 
   <!-- 3D追従テキストレイヤー -->
   <div class="anchors" id="anchors"></div>
