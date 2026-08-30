@@ -11,6 +11,7 @@
 ============================================================ */
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { MeshSurfaceSampler } from "three/addons/math/MeshSurfaceSampler.js";
 import { LineSegments2 } from "three/addons/lines/LineSegments2.js";
 import { LineSegmentsGeometry } from "three/addons/lines/LineSegmentsGeometry.js";
@@ -1052,7 +1053,11 @@ const P_CORE  = ["#8a7a5f", "#6f6248", "#9c8a6a"];   /* 花托・種 */
 /* ============================================================
    GLBスキャン読み込み（Blender製アセット完成時はここに追加）
 ============================================================ */
-const loaderGLTF = new GLTFLoader();
+const loaderGLTF = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+/* assets/models/min/*.glb は compress-models.mjs が作る圧縮済みアセット。
+   EXT_meshopt_compression を必須拡張として持つので、上の setMeshoptDecoder を
+   外すと読み込みごと失敗する。非圧縮の原本は assets/models/real/ に残してある */
+
 /* 実際に3D空間へ配置しているのは TRANSIT_OBJECTS（情景と情景のあいだに
    立つ木立）だけで、そこで使うキーは deadtree と fern の2つ。
    花の3件（gazania / heliophila / ursinia）は placeScan から一度も
@@ -1062,52 +1067,34 @@ const loaderGLTF = new GLTFLoader();
    配置に備えたもので、アセット原本も消していない。使うときは
    MODELS_DEFERRED から MODELS へ移すか、到達時のオンデマンド読み込みにする */
 const MODELS = {
-  deadtree:   "assets/models/real/dead_tree_trunk/dead_tree_trunk_1k.gltf",
-  fern:       "assets/models/real/fern_02/fern_02_1k.gltf",
+  deadtree:   "assets/models/min/deadtree.glb",
+  fern:       "assets/models/min/fern.glb",
 };
 /* 現状どこからも配置されていない。初期ロードには含めない */
 const MODELS_DEFERRED = {
-  gazania:    "assets/models/real/flower_gazania/flower_gazania_1k.gltf",
-  heliophila: "assets/models/real/flower_heliophila/flower_heliophila_1k.gltf",
-  ursinia:    "assets/models/real/flower_ursinia/flower_ursinia_1k.gltf",
+  gazania:    "assets/models/min/gazania.glb",
+  heliophila: "assets/models/min/heliophila.glb",
+  ursinia:    "assets/models/min/ursinia.glb",
 };
 const loaded = {};
 let loadedCount = 0;
 const totalCount = Object.keys(MODELS).length;
 
 function loadModel(key, url) {
-  const baseUrl = url.slice(0, url.lastIndexOf("/") + 1);
   return new Promise((resolve) => {
-    /* placeScan()（後述）はgeometryをMeshSurfaceSamplerで表面サンプリング
-       し、固定パレットで色を塗るだけで、material/textureは一切参照しない。
-       それでもGLTFLoader.load()は標準でmaterialのtexture画像（法線・拡散色・
-       ラフネス、1モデルにつき3枚）まで自動ダウンロードしてしまい、
-       5モデル合計で7.7MiB・15リクエストが完全に無駄になっていた。
-       .gltf自体はテキスト(JSON)なので、パース前にtexture参照を取り除いてから
-       GLTFLoader.parse()に渡し、画像バイナリへのリクエスト自体を発生させない */
-    fetch(url)
-      .then((r) => r.json())
-      .then((gltfJson) => {
-        if (gltfJson.materials) {
-          gltfJson.materials.forEach((m) => {
-            delete m.normalTexture;
-            delete m.occlusionTexture;
-            delete m.emissiveTexture;
-            if (m.pbrMetallicRoughness) {
-              delete m.pbrMetallicRoughness.baseColorTexture;
-              delete m.pbrMetallicRoughness.metallicRoughnessTexture;
-            }
-          });
-        }
-        gltfJson.textures = [];
-        gltfJson.images = [];
-        loaderGLTF.parse(JSON.stringify(gltfJson), baseUrl, (gltf) => {
-          loaded[key] = gltf.scene;
-          loadedCount++;
-          resolve();
-        }, () => { trackEvent("asset_load_error", { type: "model_parse", key }); loadedCount++; resolve(); });
-      })
-      .catch(() => { trackEvent("asset_load_error", { type: "model_fetch", key }); loadedCount++; resolve(); });
+    /* 以前はここで .gltf を fetch してJSONを書き換え、texture参照を剥がしてから
+       parse() に渡していた。placeScan() は geometry を MeshSurfaceSampler で
+       サンプリングするだけで material も texture も見ないのに、GLTFLoader が
+       法線・拡散色・ラフネスの画像（1モデル3枚）まで自動で取りに行き、
+       5モデル合計7.7MiB・15リクエストが完全に無駄になっていたため。
+       いまは compress-models.mjs がビルド時に material ごと落としているので、
+       素直に load() で読める */
+    loaderGLTF.load(
+      url,
+      (gltf) => { loaded[key] = gltf.scene; loadedCount++; resolve(); },
+      undefined,
+      () => { trackEvent("asset_load_error", { type: "model_load", key }); loadedCount++; resolve(); }
+    );
   });
 }
 

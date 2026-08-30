@@ -35,12 +35,22 @@ Three.js のリビジョンは `vendor/three/three.module.js` 内の
 - `addons/math/MeshSurfaceSampler.js` — メッシュ表面の点群サンプリング
 - `addons/lines/LineSegments2.js` / `LineSegmentsGeometry.js` / `LineMaterial.js` — 線画表現
 - `addons/utils/BufferGeometryUtils.js` — GLTFLoader が内部で依存
+- `addons/libs/meshopt_decoder.module.js` — 圧縮済み3Dモデルの展開（24KB）
 
 **GSAP**
 
 - `index.js` — エントリ（`gsap-core.js` と `CSSPlugin.js` を束ねる）
 - `gsap-core.js` — 本体
 - `CSSPlugin.js` — DOM要素の opacity / transform を扱うため必須
+
+## meshopt デコーダについて
+
+3Dモデルは `compress-models.mjs` で EXT_meshopt_compression をかけてある
+（6.34MB → 0.50MB）。その展開に WebAssembly を使うので、CSP の `script-src` に
+`wasm-unsafe-eval` が要る（`vercel.json` / `server.cjs`）。これは WASM の
+コンパイルだけを許可する指定で、JavaScript の `eval()` は許可しない。
+
+デコーダを外すと、拡張が必須指定なのでモデルの読み込みごと失敗する。
 
 ## 更新手順
 

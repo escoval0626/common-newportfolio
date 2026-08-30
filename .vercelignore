@@ -1,0 +1,7 @@
+# 3Dモデルの原本。compress-models.mjs の入力であって配信物ではない。
+# 実際に読むのは assets/models/min/*.glb（圧縮済み・0.50MB）のほうで、
+# ここは15MB（.bin と、剥がして使っていない textures/）ある。
+assets/models/real/
+
+# ライブラリの取得先。vendor/ に必要なファイルだけ実体を置いてある
+node_modules/

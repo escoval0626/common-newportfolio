@@ -28,6 +28,7 @@ const FILES = [
   ["node_modules/three/examples/jsm/lines/LineSegmentsGeometry.js", "vendor/three/addons/lines/LineSegmentsGeometry.js"],
   ["node_modules/three/examples/jsm/lines/LineMaterial.js", "vendor/three/addons/lines/LineMaterial.js"],
   ["node_modules/three/examples/jsm/utils/BufferGeometryUtils.js", "vendor/three/addons/utils/BufferGeometryUtils.js"],
+  ["node_modules/three/examples/jsm/libs/meshopt_decoder.module.js", "vendor/three/addons/libs/meshopt_decoder.module.js"],
   ["node_modules/gsap/index.js", "vendor/gsap/index.js"],
   ["node_modules/gsap/gsap-core.js", "vendor/gsap/gsap-core.js"],
   ["node_modules/gsap/CSSPlugin.js", "vendor/gsap/CSSPlugin.js"],

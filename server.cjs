@@ -84,8 +84,14 @@ http
                動作確認できるようにする（本番デプロイには使われない） */
             "X-Content-Type-Options": "nosniff",
             "Referrer-Policy": "strict-origin-when-cross-origin",
+            /* 'wasm-unsafe-eval' は meshopt デコーダのため。3Dモデルを
+               EXT_meshopt_compression で圧縮しており（6.34MB→0.50MB）、その展開に
+               WebAssembly を使う。これは WASM のコンパイルだけを許可する指定で、
+               JavaScript の eval() は許可しない（'unsafe-eval' とは別物）。
+               スクリプトの取得元は 'self' のままなので、外部から持ち込まれた
+               WASM が動くわけでもない。vercel.json 側も同じ値にしてある */
             "Content-Security-Policy":
-              "default-src 'self'; script-src 'self' 'sha256-DUvCf3ZDxVUIiclj1oHIUUDBV2mFirPyDuVx+nBHjCc='; " +
+              "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'sha256-DUvCf3ZDxVUIiclj1oHIUUDBV2mFirPyDuVx+nBHjCc='; " +
               "worker-src 'self'; " +
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
               "font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; " +
