@@ -1110,11 +1110,23 @@ const WASH_BY_KEY = {
 };
 
 /* GLBを正規化して粒子化（mirror=水鏡、palette=色上書き） */
+/* スキャン原本はどれも横倒しで保存されている。実測した実寸（長辺はすべてX軸）:
+     deadtree   3.05 x 0.29 x 0.28   fern       1.97 x 0.43 x 1.72
+     gazania    1.48 x 0.17 x 0.70   heliophila 2.75 x 0.40 x 1.41
+     ursinia    2.19 x 0.17 x 0.34
+   placeScan は scale = height / size.y で高さを揃えるので、横倒しのままだと
+   deadtree が14.5倍に拡大され、シーン内で 39.5 x 4.1 x 26.4 ——
+   経路（x: -14〜13）を丸ごと横断する帯になっていた。実測でそうなっていて、
+   霧の中では木立ではなくうっすらした地色にしか見えていなかった。
+   長辺をYへ起こしてから正規化する（X→Y なのでZ軸まわりに90度）*/
+const UPRIGHT_Z = Math.PI / 2;
+
 function placeScan(key, x, z, height, count, rotY = 0, opts = {}) {
   const pal = opts.palette || PALETTES[key] || P_TUFT;
   const src = loaded[key];
   if (!src) return null;
   const model = src.clone(true);
+  model.rotation.z = UPRIGHT_Z;
   const box = new THREE.Box3().setFromObject(model);
   const size = new THREE.Vector3();
   box.getSize(size);
