@@ -263,7 +263,7 @@ const pointsMat = new THREE.ShaderMaterial({
       vFres = fres;
       /* 近すぎる粒子は巨大な染みになって"ゴミ"に見えるので、大きさに上限を設け、
          至近距離では静かに退場させる（視界を横切る大きな黒点をなくす） */
-      gl_PointSize = min(aSize * uPr * (17.0 / dist) * (1.0 + fres * 0.85), uPr * 5.2);
+      gl_PointSize = min(aSize * uPr * (17.0 / dist) * (1.0 + fres * 0.85), uPr * 3.6);
       vNear = smoothstep(0.9, 2.6, dist);
       /* 墨の濃さの個体差。均一だと"点の集合"に見えるので、大半を淡く散らす */
       vInk = 0.28 + 0.72 * pow(fract(aSeed * 0.37), 1.8);
@@ -1716,7 +1716,7 @@ function buildTransitObjects(onDone) {
          常に十数本が視界の前後にいる＝ここが総量に一番効く */
       /* 空中に漂う量。元は 高さ×150・粒の大きさ等倍。
          「あと少し欲しい」ぶん、数と粒の大きさを両方上げてある */
-      perf("placeScan:" + key, () => placeScan(key, x, z, h, Math.round(h * 320), Math.random() * Math.PI * 2, { strokes: 0, grain: 1.3 }));
+      perf("placeScan:" + key, () => placeScan(key, x, z, h, Math.round(h * 320), Math.random() * Math.PI * 2, { strokes: 0, grain: 1.12 }));
     }
     if (i < TRANSIT_OBJECTS.length) requestAnimationFrame(step);
     else if (onDone) onDone();
