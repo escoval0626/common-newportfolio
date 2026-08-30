@@ -748,7 +748,15 @@ function applyDust(rec, group, d) { perf("applyDust", () => {
 
 /* 従来のメインスレッド版。ワーカーが使えない環境向けのフォールバックで、
    アルゴリズムは dust-worker.js 側と完全に同じ（見た目を変えないため） */
+/* ワーカーが使えないとき、粒子の枚数をそのまま同期処理に流すと、
+   1枚ぶんの生成がまるごとメインスレッドを占有する（この処理は以前
+   最長1.7秒ブロックしていて、ワーカーへ逃がした経緯がある）。
+   密度を 2600 → 6500 に上げたぶん、フォールバック側は据え置きにする。
+   粒がやや疎になるが、数秒フリーズするよりはずっといい */
+const SYNC_DUST_CAP = 2600;
+
 function buildDustSync(rec, group, imageUrl, aspect, count, lineUrl, done) {
+  count = Math.min(count, SYNC_DUST_CAP);
   let edgeMap = null, emW = 0, emH = 0;
   /* 線画から「輪郭マップ」を作る：輪郭に近い粒子ほど早く着地させるため */
   function buildEdgeMap(cb) {
@@ -1000,10 +1008,13 @@ function addArtwork(url, x, y, z, worldWidth, faceTo, opts = {}) {
     far: (opts.far ?? 26) * dist,
   };
   artworks.push(rec);
-  /* 画像そのものを点描化して「散らばり→結合」の粒子演出（軽め） */
-  /* 粒は「結んだ時だけ」見せる作りにしたので、密度は要らない。
-     半透明の点は重なるほど塗り直しになるため、枚数がそのまま負荷になる */
-  if (opts.dust !== false) addSceneDust(rec, g, url, aspect, opts.dustCount ?? 2600, url);
+  /* 画像そのものを点描化して「散らばり→結合」の粒子演出。
+     以前は2600に絞ってあった（半透明の点は重なるほど塗り直しになるので、
+     枚数がそのまま塗り面積の負荷になる、という理由）。
+     ただし実測すると1フレーム4.2ms（1440x810・draw147・points30,210）で、
+     60fpsの予算16.7msに対して4倍の余裕があった。絞りすぎで、
+     結合前の「散らばり」が薄くなっていたので上げる */
+  if (opts.dust !== false) addSceneDust(rec, g, url, aspect, opts.dustCount ?? 6500, url);
   return g;
 }
 
@@ -1688,7 +1699,7 @@ function buildTransitObjects(onDone) {
       /* 係数150では、起こしたあとの細い幹（0.4幅×4.2高）に対して点が疎に見えた。
          粒子は placeScan 1回につき Points 1個へまとめられるので、増やしても
          ドローコールは増えない（増えるのは頂点数だけ）。色斑と違ってここは安い */
-      perf("placeScan:" + key, () => placeScan(key, x, z, h, Math.round(h * 240), Math.random() * Math.PI * 2, { strokes: 0 }));
+      perf("placeScan:" + key, () => placeScan(key, x, z, h, Math.round(h * 360), Math.random() * Math.PI * 2, { strokes: 0 }));
     }
     if (i < TRANSIT_OBJECTS.length) requestAnimationFrame(step);
     else if (onDone) onDone();
