@@ -1089,14 +1089,12 @@ const loaderGLTF = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
    パレット（PALETTES / WASH_BY_KEY）に名前だけ残してあるのは将来の
    配置に備えたもので、アセット原本も消していない。使うときは
    MODELS_DEFERRED から MODELS へ移すか、到達時のオンデマンド読み込みにする */
-/* 道中の木立をやめた（placeTransitWash 参照）ので、初期ロードで読む
-   モデルは無くなった。アセットと placeScan は残してあるので、
-   使うときはここへ戻す */
-const MODELS = {};
-/* 現状どこからも配置されていない。初期ロードには含めない */
-const MODELS_DEFERRED = {
+const MODELS = {
   deadtree:   "assets/models/min/deadtree.glb",
   fern:       "assets/models/min/fern.glb",
+};
+/* 現状どこからも配置されていない。初期ロードには含めない */
+const MODELS_DEFERRED = {
   gazania:    "assets/models/min/gazania.glb",
   heliophila: "assets/models/min/heliophila.glb",
   ursinia:    "assets/models/min/ursinia.glb",
@@ -1135,23 +1133,28 @@ const WASH_BY_KEY = {
 };
 
 /* GLBを正規化して粒子化（mirror=水鏡、palette=色上書き） */
-/* スキャン原本はどれも横倒しで保存されている。実測した実寸（長辺はすべてX軸）:
+/* スキャン原本はどれも横倒しで保存されている（長辺はすべてX軸）:
      deadtree   3.05 x 0.29 x 0.28   fern       1.97 x 0.43 x 1.72
      gazania    1.48 x 0.17 x 0.70   heliophila 2.75 x 0.40 x 1.41
      ursinia    2.19 x 0.17 x 0.34
    placeScan は scale = height / size.y で高さを揃えるので、横倒しのままだと
-   deadtree が14.5倍に拡大され、シーン内で 39.5 x 4.1 x 26.4 ——
-   経路（x: -14〜13）を丸ごと横断する帯になっていた。実測でそうなっていて、
-   霧の中では木立ではなくうっすらした地色にしか見えていなかった。
-   長辺をYへ起こしてから正規化する（X→Y なのでZ軸まわりに90度）*/
-const UPRIGHT_Z = Math.PI / 2;
+   短辺(deadtree で0.29)を基準に14.5倍へ拡大され、シーン内で
+   39.5 x 4.1 x 26.4 まで広がる。
+
+   これを「木立が経路を横切る帯になっている不具合」と読んで、一度
+   Z軸90度で起こした（5e13381）。だが起こすと 0.4 x 4.2 x 0.4 の細い柱に
+   なり、枝の無い幹1本では点が縦に並んだ棒にしか見えなかった（0802750で削除）。
+
+   実際には、横倒しのまま広がった状態こそが目的の絵だった。
+   高さ4.1はカメラの目線(y=1.5)を含み、630粒が広い体積に散らばるので、
+   木ではなく「3D空間を漂う粒子」として効いていた。視差もそこで生まれる。
+   起こさない。 */
 
 function placeScan(key, x, z, height, count, rotY = 0, opts = {}) {
   const pal = opts.palette || PALETTES[key] || P_TUFT;
   const src = loaded[key];
   if (!src) return null;
   const model = src.clone(true);
-  model.rotation.z = UPRIGHT_Z;
   const box = new THREE.Box3().setFromObject(model);
   const size = new THREE.Vector3();
   box.getSize(size);
@@ -1688,28 +1691,6 @@ const TRANSIT_OBJECTS = [
   ["deadtree", -13.0, -16, 6.0], ["deadtree", -14.0, -46, 6.5],
   ["deadtree",  13.0, -72, 6.0], ["deadtree", -13.5, -108, 6.2],
 ];
-/* 道中に置くのは色斑だけにした。
-
-   もともとは placeScan でスキャンモデルの表面に点を撒いて木立にしていたが、
-   スキャン原本（dead_tree_trunk）は 3.05 x 0.29 x 0.28 の細長い幹で、
-   横倒しのままだと経路を横切る39.5単位の帯、Z軸で起こすと 0.4 x 4.2 x 0.4 の
-   細い柱になる。後者は霧の中で「点が縦に並んだ棒」にしか見えず、
-   水彩の世界に硬いノイズが立つだけだった。
-
-   色斑（addWash）のほうは道中の空気そのものなので残す。
-   placeScan と WASH_BY_KEY / PALETTES はそのまま置いてあるので、
-   別のアセットで木立をやり直したくなったらここを戻せばいい。 */
-function placeTransitWash(key, x, z, height) {
-  const pal = WASH_BY_KEY[key] || ["#9aab7c", "#a08a72"];
-  const n = Math.max(3, Math.round(height * 1.2));
-  for (let w = 0; w < n; w++) {
-    addWash(x, GROUND_Y + height * (0.25 + Math.random() * 0.55), z,
-      height * (0.7 + Math.random() * 0.6),
-      pal[(Math.random() * pal.length) | 0],
-      0.16 + Math.random() * 0.08);
-  }
-}
-
 /* 20個のTRANSIT_OBJECTS全てを1フレームで処理すると、placeScan内部の
    MeshSurfaceSampler構築（三角形面積の累積分布を作る、モデルの複雑さに
    比例して重い処理）が同期的に積み重なり、5モデルの読み込み完了直後に
@@ -1727,7 +1708,8 @@ function buildTransitObjects(onDone) {
          霧に沈むシルエットは、密度を上げた点描だけのほうが静かで美しい。 */
       /* 霧に沈むシルエットなので、粒の密度は見た目にほとんど効かない。
          常に十数本が視界の前後にいる＝ここが総量に一番効く */
-      placeTransitWash(key, x, z, h);
+      /* 粒子の密度。元は 高さ×150。空中に漂う量として増やしてある */
+      perf("placeScan:" + key, () => placeScan(key, x, z, h, Math.round(h * 240), Math.random() * Math.PI * 2, { strokes: 0 }));
     }
     if (i < TRANSIT_OBJECTS.length) requestAnimationFrame(step);
     else if (onDone) onDone();
