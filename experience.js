@@ -541,11 +541,16 @@ function addWash(x, y, z, size, color, opacity = 0.34, aspect = 0.75) {
     rotation: Math.random() * Math.PI * 2,
   });
   const sp = new THREE.Sprite(m);
-  /* ワイルドさ：中心をずらして輪郭を無視させる */
+  /* ワイルドさ：中心をずらして輪郭を無視させる。
+     Zだけ size に比例しない固定値(±0.25)だったので、色斑が同じ奥行きに
+     並んだ薄い一枚板になっていた。XYも含めて size 基準に揃え、奥行きへも
+     散らす。斑の個数は増やしていない —— addWash は SpriteMaterial を
+     1個ずつ作るので、個数がそのままドローコールになる（実測112斑=112マテリアル）。
+     散らばりを広げるのは位置を変えるだけで、描画コストは変わらない */
   sp.position.set(
-    x + (Math.random() - 0.5) * size * 0.5,
-    y + (Math.random() - 0.5) * size * 0.3,
-    z + (Math.random() - 0.5) * 0.5
+    x + (Math.random() - 0.5) * size * 1.05,
+    y + (Math.random() - 0.5) * size * 0.55,
+    z + (Math.random() - 0.5) * size * 0.7
   );
   sp.scale.set(size * (0.85 + Math.random() * 0.5), size * aspect * (0.8 + Math.random() * 0.4), 1);
   sp.renderOrder = -1; /* インクの線・粒より先に描く＝色の上に線が乗る */
@@ -1680,7 +1685,10 @@ function buildTransitObjects(onDone) {
          霧に沈むシルエットは、密度を上げた点描だけのほうが静かで美しい。 */
       /* 霧に沈むシルエットなので、粒の密度は見た目にほとんど効かない。
          常に十数本が視界の前後にいる＝ここが総量に一番効く */
-      perf("placeScan:" + key, () => placeScan(key, x, z, h, Math.round(h * 150), Math.random() * Math.PI * 2, { strokes: 0 }));
+      /* 係数150では、起こしたあとの細い幹（0.4幅×4.2高）に対して点が疎に見えた。
+         粒子は placeScan 1回につき Points 1個へまとめられるので、増やしても
+         ドローコールは増えない（増えるのは頂点数だけ）。色斑と違ってここは安い */
+      perf("placeScan:" + key, () => placeScan(key, x, z, h, Math.round(h * 240), Math.random() * Math.PI * 2, { strokes: 0 }));
     }
     if (i < TRANSIT_OBJECTS.length) requestAnimationFrame(step);
     else if (onDone) onDone();
