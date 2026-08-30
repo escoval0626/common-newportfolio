@@ -559,6 +559,8 @@
 
     .hud__hint {
       position: absolute; left: 50%; bottom: calc(26px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
+      /* 波線と同じ理由。茎や情景の細い線が文字を貫いて読めるのを防ぐ */
+      text-shadow: 0 0 5px var(--bg), 0 0 10px var(--bg);
       font-size: 12px; letter-spacing: 0.32em; color: var(--ink-mid);
       transition: opacity 1s;
       /* absolute配置＋幅指定なしの複数行テキストは shrink-to-fit の
@@ -802,6 +804,14 @@
       position: absolute; left: 50%; bottom: calc(44px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
       width: 46px; height: 14px; overflow: hidden; opacity: 0.7;
       transition: opacity 0.3s;
+      /* 画面の中央を縦に走るタンポポの茎と、ちょうどここで交差する。
+         茎は3D側・この波線はDOM側なので前後関係は正しいのだが、
+         どちらも細い暗線なので同じ層に見え、線が波を貫いて見えていた。
+         以前クレジット行で同じ問題が指摘されて行ごと消したが、
+         中央にある波線と hint は残ったままだった。
+         下に帯を敷くと全フレームの絵が変わるので、線の周りだけ
+         紙の色をにじませて浮かせる */
+      filter: drop-shadow(0 0 3px var(--bg)) drop-shadow(0 0 6px var(--bg));
     }
     /* 1枚を大きく見ている間、zoom-capと同じ下部領域を使う波線・クレジットを退かす。
        特にモバイル幅ではこれらが zoom-cap のテキストと重なって読めなくなっていた */
