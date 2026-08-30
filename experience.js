@@ -420,7 +420,11 @@ function makeDustMat() {
         vec4 mv = modelViewMatrix * vec4(p, 1.0);
         float dist = max(0.6, -mv.z);
         /* 至近距離の巨大化を抑え、近すぎる粒子は退場させる（黒い染み対策） */
-        gl_PointSize = min(aSize * uPr * (17.0 / dist), uPr * 5.2);
+        /* aSize は 0.45〜1.0。17.0/dist だと旅の常用距離（15〜25）で
+           0.4〜1.0px にしかならず、点が1画素より小さいので何個撒いても
+           画面に乗らなかった（実測: 粒子が触れる画素は全体の1.06%、
+           平均寄与 0.045/255。色斑の122分の1）。実寸で見える大きさにする */
+        gl_PointSize = min(aSize * uPr * (55.0 / dist), uPr * 9.0);
         vNear = smoothstep(0.9, 2.6, dist);
         vInk = 0.28 + 0.72 * pow(fract(aSeed * 0.37), 1.8);
         { float a0 = fract(aSeed * 0.61) * 6.2831; vRot = vec2(cos(a0), sin(a0)); vElong = 1.0 + 0.95 * fract(aSeed * 0.61 * 7.3); }
@@ -1036,8 +1040,11 @@ function updateArtworks() {
       /* 粒子は「集まって形をなす」時にだけ見せる。
          散らばった状態で単体が空中に浮くと、粒子ではなく"ゴミ"に見えるため、
          結合が進むまでは出さない（遠距離＝ほぼ0）。寄って結像したら退く。 */
+      /* 指数2.6は「結合が進むまで出さない」ための強い抑制で、
+         散らばった状態がほぼ0になっていた。浮遊している粒が見えないのは
+         これが効きすぎていたため。1.25まで緩め、遠くでも気配が残るようにする */
       const gather = Math.min(1, kRaw * 1.4);
-      const fade = Math.pow(gather, 2.6) * (1.0 - k * 0.7);
+      const fade = Math.pow(gather, 1.25) * (1.0 - k * 0.7);
       a.dustMat.uniforms.uPanelFade.value = fade;
       /* 透明でも discard までは塗り面積を消費するので、消えている間は描画ごと止める */
       if (a.dustPts) a.dustPts.visible = fade > 0.004;
