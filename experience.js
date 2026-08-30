@@ -1154,6 +1154,12 @@ function placeScan(key, x, z, height, count, rotY = 0, opts = {}) {
   const pal = opts.palette || PALETTES[key] || P_TUFT;
   const src = loaded[key];
   if (!src) return null;
+  /* 粒の大きさの倍率。点サイズのシェーダ（gl_PointSize）は綿毛と共用で、
+     綿毛は近距離なので上限 uPr*5.2 に張り付いている。そちらを変えずに
+     道中の粒だけ大きくしたいので、生成時の aSize を倍率で持ち上げる。
+     道中の常用距離（15〜30）では 17.0/dist が 0.57〜1.13 にしかならず、
+     素の 0.55〜1.4 だと 0.3〜1.6px でほぼ画面に乗らない */
+  const grain = opts.grain ?? 1;
   const model = src.clone(true);
   const box = new THREE.Box3().setFromObject(model);
   const size = new THREE.Vector3();
@@ -1184,7 +1190,7 @@ function placeScan(key, x, z, height, count, rotY = 0, opts = {}) {
       sampler.sample(_sp, _sn);
       _sp.applyMatrix4(m.matrixWorld);
       _sn.transformDirection(m.matrixWorld);
-      pushParticle(a, _sp.x, _sp.y, _sp.z, pal, 0.55, 1.4, 1, _sn.x, _sn.y, _sn.z);
+      pushParticle(a, _sp.x, _sp.y, _sp.z, pal, 0.55 * grain, 1.4 * grain, 1, _sn.x, _sn.y, _sn.z);
     }
   });
   if (mirror) {
@@ -1708,8 +1714,9 @@ function buildTransitObjects(onDone) {
          霧に沈むシルエットは、密度を上げた点描だけのほうが静かで美しい。 */
       /* 霧に沈むシルエットなので、粒の密度は見た目にほとんど効かない。
          常に十数本が視界の前後にいる＝ここが総量に一番効く */
-      /* 粒子の密度。元は 高さ×150。空中に漂う量として増やしてある */
-      perf("placeScan:" + key, () => placeScan(key, x, z, h, Math.round(h * 240), Math.random() * Math.PI * 2, { strokes: 0 }));
+      /* 空中に漂う量。元は 高さ×150・粒の大きさ等倍。
+         「あと少し欲しい」ぶん、数と粒の大きさを両方上げてある */
+      perf("placeScan:" + key, () => placeScan(key, x, z, h, Math.round(h * 320), Math.random() * Math.PI * 2, { strokes: 0, grain: 1.3 }));
     }
     if (i < TRANSIT_OBJECTS.length) requestAnimationFrame(step);
     else if (onDone) onDone();
