@@ -2691,6 +2691,7 @@ function addCopyBox(area) {
     extra.className = "xp-contact-extra";
     const headline = document.createElement("p");
     headline.className = "xp-contact-extra__headline";
+    headline.lang = "en";
     headline.textContent = "Contact.";
     extra.appendChild(headline);
     /* 見た目は写真の依頼窓口だが、実際はWeb制作の受注導線も兼ねたい、という
@@ -2707,6 +2708,7 @@ function addCopyBox(area) {
     extra.appendChild(lead);
     const leadEn = document.createElement("p");
     leadEn.className = "xp-contact-extra__lead-en";
+    leadEn.lang = "en";
     leadEn.textContent = "For a photograph — or for something built.";
     extra.appendChild(leadEn);
     el.appendChild(extra);
@@ -2752,12 +2754,14 @@ function addAboutBox(area) {
   name.className = "xp-about__name";
   name.textContent = ABOUT_BIO.name;
   const nameEn = document.createElement("span");
+  nameEn.lang = "en";
   nameEn.textContent = ABOUT_BIO.nameEn;
   name.appendChild(nameEn);
   el.appendChild(name);
 
   const role = document.createElement("div");
   role.className = "xp-about__role";
+  role.lang = "en";
   role.textContent = ABOUT_BIO.role;
   el.appendChild(role);
 
@@ -2776,6 +2780,8 @@ function addAboutBox(area) {
 
   const bioEn = document.createElement("div");
   bioEn.className = "xp-about__bio-en";
+  /* 英文4段落と、その下の展示歴（見出しは英語）をまとめて英語にする */
+  bioEn.lang = "en";
   ABOUT_BIO.bioEn.forEach((line) => {
     const p = document.createElement("p");
     p.textContent = line;
@@ -2790,8 +2796,10 @@ function addAboutBox(area) {
   const exList = document.createElement("ul");
   ABOUT_BIO.exhibitions.forEach((item) => {
     const li = document.createElement("li");
+    li.lang = "ja";   /* 親(bioEn)が英語なので、日本語側は戻す */
     li.textContent = item.jp;
     const em = document.createElement("em");
+    em.lang = "en";
     em.textContent = item.en;
     li.appendChild(em);
     exList.appendChild(li);
@@ -4180,7 +4188,7 @@ loaderContent.classList.add("is-revealing");
 const hud = document.getElementById("hud");
 const hint = document.getElementById("hint");
 /* HTML側の初期文言はマウス操作前提。タッチ端末では最初の表示から入れ替える */
-if (IS_TOUCH) hint.textContent = "SWIPE — 綿毛を追う";
+if (IS_TOUCH) hint.innerHTML = '<span lang="en">SWIPE</span> — 綿毛を追う';
 const caption = document.getElementById("caption");
 const captionNum = document.getElementById("captionNum");
 const captionTitle = document.getElementById("captionTitle");
