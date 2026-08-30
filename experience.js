@@ -4220,6 +4220,7 @@ function warpTo(targetT) {
     .to(jumpVeil, { opacity: 0, duration: 0.6, ease: "power2.out" }, "+=0.04");
 }
 
+const dotWraps = [];
 const dots = AREAS.map((a) => {
   const wrap = document.createElement("div");
   wrap.className = "hud__dot-wrap";
@@ -4239,8 +4240,21 @@ const dots = AREAS.map((a) => {
   wrap.appendChild(label);
   wrap.appendChild(b);
   dotsWrap.appendChild(wrap);
+  dotWraps.push(wrap);
   return b;
 });
+
+/* 「03 / 08」。大見出し（hud__caption-title）は情景に着いた時しか出ないので、
+   道中は自分が旅のどこにいるのか分からなくなっていた。ドット列の下に
+   小さく常時置く。読み上げには各ドットの aria-current が既に効いており、
+   ここは同じ情報の見た目ぶんなので aria-hidden にする */
+const dotsCount = document.createElement("p");
+dotsCount.className = "hud__dots-count";
+dotsCount.lang = "en";
+dotsCount.setAttribute("aria-hidden", "true");
+dotsWrap.appendChild(dotsCount);
+const pad2 = (n) => String(n).padStart(2, "0");
+let shownCountIdx = -1;
 
 /* ロゴ＝サイトの入口。クリックで旅の最初（綿毛が離脱する場面）へ戻る。
    index.html を切り離した今、experience.html だけで完結するポートフォリオ
@@ -4397,6 +4411,15 @@ function updateHud(capArea, capW) {
     d.classList.toggle("is-active", isActive);
     d.setAttribute("aria-current", isActive ? "true" : "false");
   });
+  /* 現在地の表示は active（＝情景に着いている時だけ入る）ではなく capArea
+     （＝常に最も近い情景）で出す。active で出すと、情景と情景のあいだで
+     名前も番号も消えてしまい、旅の半分がどこにいるか分からない区間になる */
+  const nearIdx = capArea ? AREAS.indexOf(capArea) : -1;
+  if (nearIdx !== shownCountIdx) {
+    shownCountIdx = nearIdx;
+    dotWraps.forEach((w, i) => w.classList.toggle("is-current", i === nearIdx));
+    dotsCount.textContent = nearIdx >= 0 ? pad2(nearIdx + 1) + " / " + pad2(AREAS.length) : "";
+  }
   progressBar.style.width = `${rig.progress * 100}%`;
   /* 部屋の中（別の「戻る」導線がある）と、既にCONTACTにいる間は隠す。
      それ以外は常に出しておき、どこからでも1クリックで問い合わせ先へ行ける */

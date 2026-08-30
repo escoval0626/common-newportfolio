@@ -543,6 +543,19 @@
       transition: opacity 0.3s ease, transform 0.3s ease;
     }
     .hud__dot-wrap:hover .hud__dot-label { opacity: 1; transform: translateY(-50%) translateX(0); }
+    /* 現在地の名前だけは常に出す。ホバーに頼ると、タッチ端末では永久に読めず、
+       情景と情景のあいだ（大見出しが消えている区間）でも手がかりが無くなる */
+    .hud__dot-wrap.is-current .hud__dot-label { opacity: 1; transform: translateY(-50%) translateX(0); color: var(--ink); }
+    /* 細い輪郭だけだと押せるものに見えないので、触れたら輪郭が締まる */
+    .hud__dot:hover { border-color: var(--ink); }
+
+    /* 「全8箇所のうち何番目か」。大見出しは情景に着いた時しか出ないため、
+       道中でも旅のどこにいるかが分かるように、ドット列の下へ小さく置く */
+    .hud__dots-count {
+      margin: 8px 0 0; align-self: flex-end;
+      font-family: var(--font-latin); font-size: 9px; letter-spacing: 0.2em;
+      color: var(--ink-dim); white-space: nowrap;
+    }
 
     .hud__hint {
       position: absolute; left: 50%; bottom: calc(26px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
@@ -913,8 +926,10 @@
        ホバー前提の変化（下線の常時点灯）は最初から適用しておく */
     @media (hover: none) {
       .xp-hotspot__label::after { animation-play-state: paused; transform: scaleX(1); opacity: 0.75; }
-      /* タッチ環境にホバーは無く、直後の指の位置に張り付いた表示が残るだけなので出さない */
+      /* タッチ環境にホバーは無く、直後の指の位置に張り付いた表示が残るだけなので出さない。
+         ただし現在地だけは別で、これを消すとドット8つが全て無名の点になる */
       .hud__dot-label { display: none; }
+      .hud__dot-wrap.is-current .hud__dot-label { display: block; }
     }
 
     /* 一人称視点の移動＋常時揺れるカメラ＋無限ループの装飾アニメーションが重なるため、
