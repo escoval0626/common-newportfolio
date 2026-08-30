@@ -2194,6 +2194,33 @@ function ensureAreasAround(t, ahead = 1) {
   }
 }
 
+/* 入場したあと、まだ組んでいないエリアを旅の順に少しずつ組み足す。
+
+   遅延構築を入れたとき「残りは背景で追いつく」と書いたが、実際には
+   追いついていなかった。旧コードの setTimeout(buildNextArea, 180) が
+   無くなり、ensureAreasAround が呼ばれる範囲（現在地の前後）しか
+   組まれないままになっていたため、8エリア中どの瞬間も3つしか存在せず、
+   霧の奥に見えるはずの先の情景が丸ごと消えていた。
+   実測: artworks 4/12、総粒子 58,062。全部組むと 104,698 まで戻る。
+
+   組むこと自体は安い（全エリアぶんで7ms、描画も1フレーム1.2msのまま）。
+   高いのはコラージュ絵のダウンロードのほうなので、READYを待たせない
+   よう入場後に回し、間隔を空けて最初のエリアの帯域を食わないようにする。
+   画像は alphaQuality の調整で12枚2.80MB（モバイル）まで下がっており、
+   遅延構築を入れた当時（5.59MB）とは前提が変わっている。 */
+let bgBuildTimer = 0;
+function buildRemainingAreas() {
+  clearTimeout(bgBuildTimer);
+  /* 通信量を切り詰めたい人（データセーバー）には先読みしない。
+     従来どおり ensureAreasAround が近づいた分だけ組む */
+  const net = navigator.connection;
+  if (net && (net.saveData || /2g/.test(net.effectiveType || ""))) return;
+  const next = buildOrder.find((a) => !a._built);
+  if (!next) return;
+  ensureAreaBuilt(next);
+  bgBuildTimer = setTimeout(buildRemainingAreas, 450);
+}
+
 /* 全読込→シーン構築 */
 Promise.all(
   Object.entries(MODELS).map(([k, u]) => loadModel(k, u))
@@ -2204,7 +2231,7 @@ Promise.all(
      ENTER直後に必要な最初のエリア分の帯域を、まだ訪れてもいない後方の
      エリアの画像が食い合っていた。旅の順番（t昇順）に沿って少しずつ
      間隔を空けて組み立て、最初の2エリア分が組み上がった時点でENTERを
-     解禁する（残りは背景で追いつく。詩コピー等のDOM要素やホットスポットは
+     解禁する（残りは入場後に buildRemainingAreas が組み足す。詩コピー等のDOM要素やホットスポットは
      別途モジュール読み込み時に用意済みなので、旅の進行自体は妨げない） */
   /* 以前は180ms間隔で全8エリアを順に組んでいたため、READYの1秒強あとには
      まだ訪れてもいない情景を含む12枚すべての取得が始まっていた。
@@ -4288,6 +4315,8 @@ enterBtn.addEventListener("click", () => {
      1フレーム遅らせ、このクリックの伝播が完全に終わってから有効化する */
   requestAnimationFrame(() => {
     rig.entered = true;
+    /* 先の情景を霧の奥に立たせるため、残りのエリアを背景で組み足す */
+    buildRemainingAreas();
     /* URLに情景のハッシュ（#plants 等、updateUrlHash が着地時に付ける）が
        付いていれば、共有されたリンクとしてそこへ着地する。
        まっさらな訪問（ハッシュ無し）はいつも通り冒頭から始まる。
