@@ -2524,7 +2524,10 @@ function updateCamera(dt) {
   }
   /* ヒーロータイトル：冒頭で表示、スクロールで退場（progress 0.01→0.06 で消える） */
   if (heroTitle) {
-    const tOp = (1 - THREE.MathUtils.smoothstep(rig.progress, 0.012, 0.06)) * (rig.entered ? 1 : 0);
+    /* 退場が 0.06 まで続くと、その間ずっと副題（写真家名）と
+       背後の縦組みコピーが重なって見える。半透明どうしなので
+       にじみでは隠しきれない。露出する時間そのものを短くする */
+    const tOp = (1 - THREE.MathUtils.smoothstep(rig.progress, 0.010, 0.040)) * (rig.entered ? 1 : 0);
     heroTitle.style.opacity = tOp.toFixed(3);
   }
 
@@ -3402,8 +3405,14 @@ if (IS_TOUCH && zoomCap) {
   const zoomHint = zoomCap.querySelector(".zoom-cap__hint");
   if (zoomHint) zoomHint.textContent = "TAP TO RETURN";
 }
+/* 拡大表示の収まり。ZOOM_CAP_BAND は左下のキャプションのために
+   画面下へ空ける帯（画面高に対する割合）。写真はそのぶん上へ寄る。 */
+const ZOOM_FIT_H = 0.76;
+const ZOOM_CAP_BAND = 0.19;
+
 const _fwd = new THREE.Vector3();
 const _wp2 = new THREE.Vector3();
+const _up2 = new THREE.Vector3();
 let zoomTl = null;
 
 function zoomCapText(mesh, n, total) {
@@ -3451,9 +3460,25 @@ function bringToFront(mesh, tlLocal, at, dur) {
   /* 画面に収める基準は「プリントの実寸（クランプ前）」 */
   /* モバイルは画面自体が狭く、PC想定の74%幅だと写真がひとまわり
      小さく見えていた。タッチ端末は使える横幅の上限を引き上げる */
-  const k = Math.min((vh * 0.86) / ROW_H, (vw * (IS_TOUCH ? 0.90 : 0.74)) / printW2);
+  /* 以前は高さの上限が 0.86 で、印画紙が画面中央に置かれていた。
+     1280x720 では上下の余白が各50pxしか残らず、左下のキャプション
+     （番号・タイトル・メタ・操作ヒントの4行・約100px）が完全に写真の上に
+     乗っていた。実測で見出し幅286pxのうち150px（52%）が写真に重なり、
+     暗い写真ではタイトルが読めなくなっていた。1920では13%まで減るので、
+     いちばん台数の多いノートPC幅で最悪になる。
+     写真は小さくなるが、作品を見る主画面で文字が像に乗るほうが損。 */
+  const k = Math.min((vh * ZOOM_FIT_H) / ROW_H, (vw * (IS_TOUCH ? 0.90 : 0.74)) / printW2);
   const w2 = (printW2 + ROOM_PAD * 2) * k, h2 = (ROW_H + ROOM_PAD * 2) * k;
   _wp2.copy(camera.position).addScaledVector(_fwd, D).sub(r.group.position);
+  /* 印画紙の下端が、キャプション帯の上に来るまで持ち上げる。
+     縦横比の都合で幅のほうが効いている場合（モバイル等）は、もともと
+     下に余白があるので寄せない（lift が負になるので 0 で止める）。 */
+  const printH = ROW_H * k;
+  const lift = Math.max(0, -vh * 0.5 + vh * ZOOM_CAP_BAND + printH * 0.5);
+  if (lift > 0) {
+    _up2.set(0, 1, 0).applyQuaternion(camera.quaternion);
+    _wp2.addScaledVector(_up2, lift);
+  }
 
   if (!d.homePos) {
     d.homePos = mesh.position.clone();

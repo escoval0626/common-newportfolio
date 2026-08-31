@@ -164,7 +164,10 @@
     /* ===== 1枚を選んで見る時の見出し。誌面の扉のように、罫と余白で組む ===== */
     .zoom-cap {
       position: fixed; z-index: 9; pointer-events: none;
-      left: calc(clamp(28px, 6vw, 88px) + env(safe-area-inset-left, 0px)); bottom: calc(clamp(30px, 7vh, 74px) + env(safe-area-inset-bottom, 0px));
+      /* 印画紙の下に空けた帯（ZOOM_CAP_BAND = 画面高の19%）に収める。
+         7vh のままだと 720px 高で 50px 下がり、4行ぶん（約100px）と
+         合わせて帯を 29px はみ出して写真に掛かっていた */
+      left: calc(clamp(28px, 6vw, 88px) + env(safe-area-inset-left, 0px)); bottom: calc(clamp(20px, 3.2vh, 48px) + env(safe-area-inset-bottom, 0px));
       opacity: 0;
     }
     /* 明示的な閉じるボタン。これまでEscキーだけが頼りで、キーボード操作に
@@ -241,16 +244,17 @@
       font-style: italic; font-weight: 300;
     }
     .hero-title__sub {
-      /* 冒頭 progress 0.012〜0.056 の間、背後（.anchors は z-index 6）の
-         縦組みコピーがこの行と 63x12px 重なり、写真家名が串刺しに見えていた。
-         こちらが上（z-index 7）なので、周囲に紙の色をにじませれば分離できる */
-      text-shadow: 0 0 6px var(--bg), 0 0 12px var(--bg);
       margin: 18px 0 0; padding-left: 0.3em;
       display: flex; align-items: center; gap: 14px;
       font-family: var(--font-latin); font-weight: 300;
       font-size: 12px; letter-spacing: 0.42em; text-transform: uppercase;
       color: #5f5a52;
-      text-shadow: 0 0 6px #f4f1ea;
+      /* 退場のフェード中（progress 0.012〜）に、背後の縦組みコピーが
+         この行と 199x12px 重なる。潰れるのが写真家名なので、
+         にじみを一段厚くして紙から浮かせる。ただしフェード中は
+         この行ごと半透明になり、にじみも同じだけ薄くなるため、
+         これだけでは消しきれない（実装側でフェード窓も詰めてある） */
+      text-shadow: 0 0 6px #f4f1ea, 0 0 14px #f4f1ea, 0 0 3px #f4f1ea;
     }
     .hero-title__sub::before {
       content: ""; width: clamp(28px, 4vw, 52px); height: 1px;
