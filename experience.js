@@ -3065,13 +3065,20 @@ function updateAnchors() {
     const defocus = Math.max(0, Math.abs(d - focusDist) - DOF);
     const blur = a.sharp ? 0 : THREE.MathUtils.clamp(defocus * 0.28, 0, 3);
     let proximity;
+    /* 消え際に余韻を残す。素の距離比をそのまま不透明度にすると、
+       情景コピーは w が 0.4 を切った時点で完全に消えていた（実測で
+       進行度にして 0.034 ぶんしか猶予が無く、読み終わる前に消える）。
+       ①ゼロになる位置を遠くへ延ばして猶予そのものを広げ、
+       ②べき 0.72 の曲線を掛けて、中盤を高いまま保たせる。
+       これが無いと、線形なので「すっと均等に消える」＝素っ気なくなる */
+    const LINGER = 0.72;
     if (a.beatT !== null) {
       /* ビート：窓を広げ、しっかり見える区間を長く */
-      proximity = THREE.MathUtils.clamp(1 - Math.abs(rig.progress - a.beatT) / 0.11, 0, 1);
-      proximity = Math.min(1, proximity * 1.4);
+      proximity = THREE.MathUtils.clamp(1 - Math.abs(rig.progress - a.beatT) / 0.15, 0, 1);
+      proximity = Math.pow(Math.min(1, proximity * 1.35), LINGER);
     } else {
       const w = a.area ? a.area.currentW : 1;
-      proximity = THREE.MathUtils.clamp((w - 0.4) / 0.45, 0, 1);
+      proximity = Math.pow(THREE.MathUtils.clamp((w - 0.22) / 0.6, 0, 1), LINGER);
     }
     a.el.style.transform = `translate(-50%, -50%) translate(${x}px, ${y}px) scale(${scale})`;
     a.el.style.filter = `blur(${blur.toFixed(2)}px)`;
