@@ -2075,18 +2075,20 @@ const OPENING_COPY = {
    opacity = near^1.25 * (veil / 0.85) なので、霧が晴れている情景の中では
    数式上ゼロになり、渡りの最中にしか現れない。
 
-   以前は「全部の移動でやると様式が飽びる」として3回だけに絞っていたが、
-   情景は8つ＝渡りは7区間あり、3つでは ARCHITECTURES→SNAPS→ABSTRACTS→
-   EXHIBITIONS の3連続が全部無言になっていた（旅の中盤がまるごと白紙）。
-   7区間すべてに置く。t は各情景の中間地点。 */
+   情景は8つ＝渡りは7区間あるが、置いてあるのは3つだけ。
+   ARCHITECTURES→SNAPS→ABSTRACTS→EXHIBITIONS の3連続が無言になるので、
+   ここは埋める余地がある。ただし埋めるのは撮影者の言葉でなければならない。
+
+   一度この4区間に代筆を入れたが、全部が「次に何が来るか」を示す
+   案内標識になっていて撤回した（0.3255「足もとから、目が遠くなる。」＝
+   近景から遠景へ、0.5605「線がほどけて、人の音がする。」＝建築から
+   スナップへ、というように、行き先の説明でしかなかった）。
+   下の3行はどれも行き先に触れていない。渡っている最中の状態だけを書き、
+   読み手を先へ急がせない。それがこの位置のコピーの役目。 */
 const VALLEY_LINES = [
-  { t: 0.209,  text: "まだ名前のない風景へ。" },        /* ABOUT → PLANTS */
-  { t: 0.3255, text: "足もとから、目が遠くなる。" },      /* PLANTS → LANDSCAPES */
-  { t: 0.443,  text: "見えない時間が、目を澄ませる。" },  /* LANDSCAPES → ARCHITECTURES */
-  { t: 0.5605, text: "線がほどけて、人の音がする。" },    /* ARCHITECTURES → SNAPS */
-  { t: 0.6775, text: "かたちが、名前を手放していく。" },  /* SNAPS → ABSTRACTS */
-  { t: 0.7945, text: "選ばなかった一枚も、ここにいる。" },/* ABSTRACTS → EXHIBITIONS */
-  { t: 0.912,  text: "霧のむこうは、いつも明るい。" },    /* EXHIBITIONS → CONTACT */
+  { t: 0.209, text: "まだ名前のない風景へ。" },      /* ABOUT → PLANTS */
+  { t: 0.443, text: "見えない時間が、目を澄ませる。" },/* LANDSCAPES → ARCHITECTURES */
+  { t: 0.912, text: "霧のむこうは、いつも明るい。" },  /* EXHIBITIONS → CONTACT */
 ];
 
 /* ABOUT：自己紹介カット（commonbyshokitago.com/about/ の本文をそのまま使用） */
