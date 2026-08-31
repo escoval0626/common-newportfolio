@@ -2072,12 +2072,21 @@ const OPENING_COPY = {
 };
 
 /* 谷の詩：情景と情景の"あいだ"、霧が閉じて何も見えない渡りにだけ漂う1行。
-   何も無い時間に意味を置くための言葉なので、全部の移動でやると様式が飽きる。3回だけ。
-   t は各情景の中間地点（ABOUT→PLANTS ／ LANDSCAPES→ARCH ／ EXHIBITIONS→CONTACT）。 */
+   opacity = near^1.25 * (veil / 0.85) なので、霧が晴れている情景の中では
+   数式上ゼロになり、渡りの最中にしか現れない。
+
+   以前は「全部の移動でやると様式が飽びる」として3回だけに絞っていたが、
+   情景は8つ＝渡りは7区間あり、3つでは ARCHITECTURES→SNAPS→ABSTRACTS→
+   EXHIBITIONS の3連続が全部無言になっていた（旅の中盤がまるごと白紙）。
+   7区間すべてに置く。t は各情景の中間地点。 */
 const VALLEY_LINES = [
-  { t: 0.209, text: "まだ名前のない風景へ。" },
-  { t: 0.443, text: "見えない時間が、目を澄ませる。" },
-  { t: 0.912, text: "霧のむこうは、いつも明るい。" },
+  { t: 0.209,  text: "まだ名前のない風景へ。" },        /* ABOUT → PLANTS */
+  { t: 0.3255, text: "足もとから、目が遠くなる。" },      /* PLANTS → LANDSCAPES */
+  { t: 0.443,  text: "見えない時間が、目を澄ませる。" },  /* LANDSCAPES → ARCHITECTURES */
+  { t: 0.5605, text: "線がほどけて、人の音がする。" },    /* ARCHITECTURES → SNAPS */
+  { t: 0.6775, text: "かたちが、名前を手放していく。" },  /* SNAPS → ABSTRACTS */
+  { t: 0.7945, text: "選ばなかった一枚も、ここにいる。" },/* ABSTRACTS → EXHIBITIONS */
+  { t: 0.912,  text: "霧のむこうは、いつも明るい。" },    /* EXHIBITIONS → CONTACT */
 ];
 
 /* ABOUT：自己紹介カット（commonbyshokitago.com/about/ の本文をそのまま使用） */
