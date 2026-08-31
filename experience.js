@@ -3234,6 +3234,7 @@ function ensureRoomTexture(m) {
     m.material.uniforms.uTex.value = tex;
     gsap.to(m.material.uniforms.uOpacity, { value: 1, duration: 0.5, ease: "power2.out" });
     if (d.area._room) d.area._room.relayout();
+    refitZoom(m);   /* 拡大中に届いた場合、拡大側の寸法も実寸で引き直す */
   }, undefined, () => {
     d.loading = false;
     trackEvent("asset_load_error", { type: "photo_thumb", area: d.area ? d.area.name : null, url: thumbUrl(d.url) });
@@ -3255,8 +3256,27 @@ function ensureFullTexture(mesh) {
     if (d.tex) d.tex.dispose();
     d.tex = fullTex;
     if (activeRoom && activeRoom.zoomed === mesh) mesh.material.uniforms.uTex.value = fullTex;
+    if (d.area && d.area._room) d.area._room.relayout();
+    refitZoom(mesh);
   });
 }
+/* 拡大の寸法は bringToFront が「その時点で判っている縦横比」で決めて
+   GSAP に焼き込む。テクスチャがまだ届いていないと
+   ar = im && im.width ? im.width/im.height : 1.5（＝3:2の横位置）と
+   決め打ちするため、縦位置の写真が横フレームに引き伸ばされたまま固定される。
+   しかも uCrop は (1,1) へ tween されるので像がそのまま歪む。
+   実測: 収録99点のうち54点（55%）が縦位置(2:3)で、この決め打ちは
+   過半数で外れる。写真家のポートフォリオで作品を誤った縦横比で見せるのは
+   起こしうる中で最悪に近い。実寸が判った時点で組み直す。 */
+function refitZoom(mesh) {
+  if (!activeRoom || activeRoom.zoomed !== mesh) return;
+  const u = mesh.material.uniforms;
+  /* 開く途中で届くこともある。同じプロパティを二重に動かさないよう、
+     先に走っている tween を止めてから引き直す */
+  gsap.killTweensOf([mesh.position, mesh.scale, u.uPlane.value, u.uPrint.value, u.uPhoto.value, u.uCrop.value]);
+  bringToFront(mesh, gsap.timeline(), 0, 0.3);
+}
+
 function releaseRoomTexture(r, m) {
   const d = m.userData;
   if (!d.loaded) return;
