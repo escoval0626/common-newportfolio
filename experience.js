@@ -2087,20 +2087,20 @@ const VALLEY_LINES = [
   { t: 0.209,  jp: "まだ名前のない風景へ。",
                 en: "Toward a landscape not yet named." },
   /* PLANTS → LANDSCAPES */
-  { t: 0.3255, jp: "白は、時間を測らない。",
-                en: "White does not keep time." },
+  { t: 0.3255, jp: "頬にあたる空気が、やわらかい。",
+                en: "The air against my cheek is soft." },
   /* LANDSCAPES → ARCHITECTURES */
   { t: 0.443,  jp: "見えない時間が、目を澄ませる。",
                 en: "Unseen time clears the eye." },
   /* ARCHITECTURES → SNAPS */
-  { t: 0.5605, jp: "静けさが、遠さをつくっている。",
-                en: "Stillness is making the distance." },
+  { t: 0.5605, jp: "気配だけ、まだそこにいる気がした。",
+                en: "Only the presence — I felt it was still there." },
   /* SNAPS → ABSTRACTS */
-  { t: 0.6775, jp: "かたちになる前の、あわい。",
-                en: "The interval before form." },
+  { t: 0.6775, jp: "影も、いっしょに薄くなる。",
+                en: "My shadow is fading with me." },
   /* ABSTRACTS → EXHIBITIONS */
-  { t: 0.7945, jp: "見ないことで、近づいている。",
-                en: "By not looking, coming closer." },
+  { t: 0.7945, jp: "記憶は、あとから追いついてくる。",
+                en: "Memory comes catching up later." },
   /* EXHIBITIONS → CONTACT */
   { t: 0.912,  jp: "霧のむこうは、いつも明るい。",
                 en: "Beyond the fog, it is always bright." },
