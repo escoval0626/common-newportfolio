@@ -241,6 +241,10 @@
       font-style: italic; font-weight: 300;
     }
     .hero-title__sub {
+      /* 冒頭 progress 0.012〜0.056 の間、背後（.anchors は z-index 6）の
+         縦組みコピーがこの行と 63x12px 重なり、写真家名が串刺しに見えていた。
+         こちらが上（z-index 7）なので、周囲に紙の色をにじませれば分離できる */
+      text-shadow: 0 0 6px var(--bg), 0 0 12px var(--bg);
       margin: 18px 0 0; padding-left: 0.3em;
       display: flex; align-items: center; gap: 14px;
       font-family: var(--font-latin); font-weight: 300;
@@ -521,6 +525,7 @@
 
     /* 進行ドット（クリックでそのエリアへ滑走） */
     .hud__dots {
+      transition: opacity 0.4s;
       position: absolute; right: calc(clamp(18px, 3vw, 44px) + env(safe-area-inset-right, 0px)); top: 50%; transform: translateY(-50%);
       display: flex; flex-direction: column; gap: 18px; pointer-events: auto;
     }
@@ -571,6 +576,11 @@
     }
     .hud__hint.is-faded { opacity: 0; }
     .hud__hint__br { display: none; }
+    /* 部屋のヒントは2文（"流す" と "大きく見る"）を <br> で割っているが、
+       その <br> はモバイル専用で、デスクトップでは display:none。
+       結果 "…流すCLICK…" と地続きになって読めなかった。
+       改行が効かない幅では、代わりに間隔で切る */
+    .hud__hint__sep { display: inline-block; width: 1.8em; }
 
     .hud__progressbar {
       position: absolute; left: 0; bottom: env(safe-area-inset-bottom, 0px); height: 2px; width: 100%;
@@ -816,6 +826,12 @@
     /* 1枚を大きく見ている間、zoom-capと同じ下部領域を使う波線・クレジットを退かす。
        特にモバイル幅ではこれらが zoom-cap のテキストと重なって読めなくなっていた */
     .hud__wave.is-zoom-hidden { opacity: 0; }
+    /* c1e63e0 で「SNSの円が閉じるボタンと衝突する」指摘に対応した際、
+       JS側（openZoom）で is-zoom-hidden を付けるところまでは入ったが、
+       このCSSルールが書かれていなかった。socialEl.inert = true は効くので
+       誤タップは起きないが、円は出たまま閉じるボタンと 34x32px
+       （幅の77%）重なって見えていた。意図どおり一緒に退場させる */
+    .hud__social.is-zoom-hidden { opacity: 0; }
     .hud__wave svg { display: block; animation: waveSlide 2.2s linear infinite; }
     @keyframes waveSlide { from { transform: translateX(0); } to { transform: translateX(-23px); } }
 
@@ -873,6 +889,7 @@
          white-space は nowrap のままにし、<br> で分けた各行の中では
          引き続き自動折返しを禁止する（=意図しない場所で割れない） */
       .hud__hint__br { display: inline; }
+      .hud__hint__sep { display: none; }   /* 改行が効くので間隔は不要 */
       /* hint が2行（34px）になると上端が波線（bottom:44px、上端58px）に
          達して重なるため、波線をさらに上へ逃がす。hint が1行の時は
          余白が少し増えるだけで実害はない */
@@ -904,6 +921,16 @@
          空いた分でCONTACTの文字サイズを読める大きさまで戻す */
       .hud__back:not(.is-visible) { display: none; }
       .hud__contact { font-size: 11px; letter-spacing: 0.08em; }
+      /* .is-hidden は opacity だけで、レイアウトからは外れていなかった。
+         部屋では BACK と入れ替わりで消えるはずが、透明なまま横幅を
+         占め続け、375px では note の円が 24px 画面外へはみ出し、
+         ロゴと BACK の間隔も 0px まで詰まっていた（実測）。
+         狭い幅では場所ごと空ける（BACK と CONTACT は同時に出ない） */
+      .hud__contact.is-hidden { display: none; }
+      /* 部屋では写真が画面幅いっぱいに並ぶため、右端のドット列が
+         写真の上に 41px 重なっていた（実測）。旅の地図は部屋の外の話で、
+         ここから出る導線は BACK が担っているので、狭い幅では退場させる */
+      .hud.is-room .hud__dots { opacity: 0; pointer-events: none; }
 
       /* タップ領域をWCAG目安の44pxまで拡げる。見た目のドット自体は
          疑似要素で小さく描き、視覚的な印象は変えない */

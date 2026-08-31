@@ -3867,10 +3867,11 @@ function openGallery(area) {
   /* white-space:nowrap と組ませて、モバイル幅では明示的な位置で2行に割る。
      自動折返しに任せると "SCROL" "L" のように単語の途中で割れていた */
   hint.innerHTML = IS_TOUCH
-    ? "SWIPE — 流す<br class=\"hud__hint__br\">TAP — 大きく見る"
-    : "DRAG / SCROLL — 流す<br class=\"hud__hint__br\">CLICK — 大きく見る";
+    ? '<span lang="en">SWIPE</span> — 流す<span class="hud__hint__sep"></span><br class="hud__hint__br"><span lang="en">TAP</span> — 大きく見る'
+    : '<span lang="en">DRAG / SCROLL</span> — 流す<span class="hud__hint__sep"></span><br class="hud__hint__br"><span lang="en">CLICK</span> — 大きく見る';
   hint.classList.remove("is-faded");
   roomBack.classList.add("is-visible");
+  hud.classList.add("is-room");   /* 部屋の中だけ効かせたいCSSのための状態 */
   roomBack.tabIndex = 0; /* 非表示中はTab順から外している。表示に合わせて戻す */
   roomBack.focus(); /* キーボード操作の起点を、旅の外へ戻れるこのボタンに置く */
   transitionActive = true;
@@ -3940,6 +3941,7 @@ function closeGallery(instant = false) {
   hint.textContent = IS_TOUCH ? "SWIPE — 綿毛を追う" : "SCROLL / DRAG — 綿毛を追う";
   hint.classList.add("is-faded");
   roomBack.classList.remove("is-visible");
+  hud.classList.remove("is-room");
   roomBack.tabIndex = -1; /* 見えないボタンにTabで止まり、Enterで意図せず旅の外へ出てしまうのを防ぐ */
   /* 部屋に入る前にフォーカスしていた場所（ホットスポット等）へ戻す。
      その要素が消えている場合（ドット操作等）は無理に追わず諦める */
