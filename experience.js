@@ -3232,7 +3232,10 @@ function ensureRoomTexture(m) {
     d.loaded = true;
     d.tex = tex;
     m.material.uniforms.uTex.value = tex;
-    gsap.to(m.material.uniforms.uOpacity, { value: 1, duration: 0.5, ease: "power2.out" });
+    /* 拡大中に届いた場合、その板が拡大対象でなければ伏せたままにする
+       （出さないと、隣が後から浮かび上がってくる） */
+    const shown = activeRoom && activeRoom.zoomed && activeRoom.zoomed !== m ? 0 : 1;
+    gsap.to(m.material.uniforms.uOpacity, { value: shown, duration: 0.5, ease: "power2.out" });
     if (d.area._room) d.area._room.relayout();
     refitZoom(m);   /* 拡大中に届いた場合、拡大側の寸法も実寸で引き直す */
   }, undefined, () => {
@@ -3430,15 +3433,32 @@ if (IS_TOUCH && zoomCap) {
   const zoomHint = zoomCap.querySelector(".zoom-cap__hint");
   if (zoomHint) zoomHint.textContent = "TAP TO RETURN";
 }
-/* 拡大表示の収まり。ZOOM_CAP_BAND は左下のキャプションのために
-   画面下へ空ける帯（画面高に対する割合）。写真はそのぶん上へ寄る。 */
-const ZOOM_FIT_H = 0.76;
-const ZOOM_CAP_BAND = 0.19;
+/* 拡大表示で印画紙が占める画面高の上限。
+   一度これを 0.76 まで下げ、空いた下の帯にキャプションを逃がしたことが
+   あるが、横位置で画面幅の58.8%、縦位置で28.1%まで縮み、
+   「作品が画面を支配する瞬間が一度も来ない」状態になった。
+   キャプションは排他配置ではなく、サイト共通の4層ハローで
+   絵の上に重ねる（.xp-copy__col と同じ手当て）ほうが正しい。 */
+const ZOOM_FIT_H = 0.86;
 
 const _fwd = new THREE.Vector3();
 const _wp2 = new THREE.Vector3();
 const _up2 = new THREE.Vector3();
 let zoomTl = null;
+
+/* 拡大中に隣のプリントが読めてしまう件。
+   下地（r.backdrop）は renderOrder -1 かつ depthWrite:false で先に描かれるため、
+   他のプリント（renderOrder 0）は距離に関係なくその上に乗る。
+   紙を一枚敷くだけでは隠せないので、拡大している間は他の板を伏せる。
+   未読込の板は元から uOpacity 0 なので、戻すときも 0 のままにする。 */
+function setSiblingOpacity(r, keep, tl, at) {
+  for (const m of r.meshes) {
+    const target = m === keep ? 1 : (keep ? 0 : (m.userData.loaded ? 1 : 0));
+    const u = m.material.uniforms.uOpacity;
+    if (tl) tl.to(u, { value: target, duration: 0.45, ease: "power2.out" }, at);
+    else gsap.to(u, { value: target, duration: 0.45, ease: "power2.out" });
+  }
+}
 
 function zoomCapText(mesh, n, total) {
   const label = `${String(n + 1).padStart(2, "0")} / ${String(total).padStart(2, "0")}`;
@@ -3492,18 +3512,11 @@ function bringToFront(mesh, tlLocal, at, dur) {
      暗い写真ではタイトルが読めなくなっていた。1920では13%まで減るので、
      いちばん台数の多いノートPC幅で最悪になる。
      写真は小さくなるが、作品を見る主画面で文字が像に乗るほうが損。 */
-  const k = Math.min((vh * ZOOM_FIT_H) / ROW_H, (vw * (IS_TOUCH ? 0.90 : 0.74)) / printW2);
+  const k = Math.min((vh * ZOOM_FIT_H) / ROW_H, (vw * (IS_TOUCH ? 0.92 : 0.82)) / printW2);
   const w2 = (printW2 + ROOM_PAD * 2) * k, h2 = (ROW_H + ROOM_PAD * 2) * k;
   _wp2.copy(camera.position).addScaledVector(_fwd, D).sub(r.group.position);
-  /* 印画紙の下端が、キャプション帯の上に来るまで持ち上げる。
-     縦横比の都合で幅のほうが効いている場合（モバイル等）は、もともと
-     下に余白があるので寄せない（lift が負になるので 0 で止める）。 */
-  const printH = ROW_H * k;
-  const lift = Math.max(0, -vh * 0.5 + vh * ZOOM_CAP_BAND + printH * 0.5);
-  if (lift > 0) {
-    _up2.set(0, 1, 0).applyQuaternion(camera.quaternion);
-    _wp2.addScaledVector(_up2, lift);
-  }
+  /* 中央に置く。キャプションはハローで絵の上に重ねるので、
+     下へ逃がすための持ち上げは要らない */
 
   if (!d.homePos) {
     d.homePos = mesh.position.clone();
@@ -3642,6 +3655,7 @@ function openZoom(mesh) {
   zoomTl = gsap.timeline({ defaults: { ease: "expo.out" } });
   zoomTl.to(r.backdrop.material, { opacity: 0.94, duration: 0.8, ease: "power2.out" }, 0);
   bringToFront(mesh, zoomTl, 0, 1.05);
+  setSiblingOpacity(r, mesh, zoomTl, 0);   /* 拡大する1枚以外を伏せる */
   zoomTl
     .to(zoomCap, { opacity: 1, duration: 0.5 }, 0.42)
     .fromTo(spans, { yPercent: 120 }, { yPercent: 0, duration: 0.85, stagger: 0.07 }, 0.42);
@@ -3675,6 +3689,7 @@ function stepZoom(dir) {
   /* 前の1枚は先に退き、入れ替わりで次が入ってくる */
   returnToWall(prev, zoomTl, 0, 0.62);
   bringToFront(next, zoomTl, 0.1, 0.9);
+  setSiblingOpacity(r, next, zoomTl, 0.1);
   zoomTl
     .set(zoomCap, { opacity: 1 }, 0)
     .fromTo(spans, { yPercent: 120 }, { yPercent: 0, duration: 0.7, stagger: 0.05 }, 0.18);
@@ -3712,6 +3727,7 @@ function closeZoom() {
   zoomTl
     .to(zoomCap, { opacity: 0, duration: 0.3, ease: "power2.in" }, 0)
     .to(r.backdrop.material, { opacity: 0, duration: 0.6 }, 0.1);
+  setSiblingOpacity(r, null, zoomTl, 0);   /* 読み込み済みの板を戻す */
   returnToWall(mesh, zoomTl, 0, 0.85);
   if (REDUCE_MOTION) zoomTl.timeScale(6);
 }

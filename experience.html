@@ -164,9 +164,6 @@
     /* ===== 1枚を選んで見る時の見出し。誌面の扉のように、罫と余白で組む ===== */
     .zoom-cap {
       position: fixed; z-index: 9; pointer-events: none;
-      /* 印画紙の下に空けた帯（ZOOM_CAP_BAND = 画面高の19%）に収める。
-         7vh のままだと 720px 高で 50px 下がり、4行ぶん（約100px）と
-         合わせて帯を 29px はみ出して写真に掛かっていた */
       left: calc(clamp(28px, 6vw, 88px) + env(safe-area-inset-left, 0px)); bottom: calc(clamp(20px, 3.2vh, 48px) + env(safe-area-inset-bottom, 0px));
       opacity: 0;
     }
@@ -184,7 +181,13 @@
     }
     .zoom-close.is-visible { opacity: 1; pointer-events: auto; }
     .zoom-close:hover, .zoom-close:focus-visible { border-color: var(--ink); color: var(--ink); }
-    .zoom-cap p, .zoom-cap h3 { overflow: hidden; margin: 0; }
+    /* 絵の上に重なるので、サイト共通の紙色ハローで浮かせる
+       （.xp-copy__col / .xp-about__bio-en p と同じ手当て）。
+       これが無いと、暗い写真の上でタイトルが読めなくなる */
+    .zoom-cap p, .zoom-cap h3 {
+      overflow: hidden; margin: 0;
+      text-shadow: 0 0 8px #f7f6f2, 0 0 18px #f7f6f2, 0 0 4px #f7f6f2, 0 1px 2px rgba(247,246,242,0.95);
+    }
     .zoom-cap span { display: inline-block; }
     .zoom-cap__num {
       font-family: var(--font-latin); font-size: 10px; letter-spacing: 0.4em;
