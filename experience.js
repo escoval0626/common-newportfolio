@@ -1748,8 +1748,13 @@ const AREAS = [
     hotspot: "",
     lines: [],
     build() {
+      /* ここだけ日英のバイオ全文が絵の全面に重なる。他の情景は詩の
+         1〜2行なので絵を濃く出せるが、ABOUTは 0.92 のままだと
+         英文（11.8px）が岩場のドローイングに埋もれて読めなかった。
+         ハローを足すより地を引くほうが確実。サイト内の maxOp は
+         0.6〜1.0 の幅があり、0.75 はその中間 */
       addArtwork("assets/scenes/about_art.webp",
-        4.0, GROUND_Y + 2.7, -15, 8.6, this.viewPos, { aspect: 0.668, maxOp: 0.92, near: 8, far: 30 });
+        4.0, GROUND_Y + 2.7, -15, 8.6, this.viewPos, { aspect: 0.668, maxOp: 0.75, near: 8, far: 30 });
       this.object = addPickProxy(4.0, -15, 7.2, 5.0, 3.0);
     },
   },

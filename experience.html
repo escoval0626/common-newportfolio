@@ -754,7 +754,9 @@
     }
     .xp-about__bio-en p {
       font-family: var(--font-latin); font-weight: 300;
-      font-size: clamp(10.5px, 0.82vw, 12.5px); line-height: 1.85; letter-spacing: 0.015em;
+      /* 1440 で 11.81px しかなく、岩場のドローイングの上で読みづらかった。
+         下限を 12px、1440 で 13.7px まで上げる */
+      font-size: clamp(12px, 0.95vw, 14px); line-height: 1.85; letter-spacing: 0.015em;
       color: #3a362f;
       text-shadow: 0 0 5px #f4f1ea, 0 0 10px #f4f1ea, 0 0 2px #f4f1ea, 0 1px 1px rgba(244,241,234,0.95);
     }
@@ -777,7 +779,7 @@
     .xp-about__exhibitions li:last-child { margin-bottom: 0; }
     .xp-about__exhibitions li em {
       display: block; font-style: normal;
-      font-family: var(--font-latin); font-weight: 300; font-size: clamp(9.5px, 0.74vw, 11.5px); letter-spacing: 0.05em;
+      font-family: var(--font-latin); font-weight: 300; font-size: clamp(10.5px, 0.8vw, 12px); letter-spacing: 0.05em;
       color: #6a655c; margin-top: 2px;
       text-shadow: 0 0 5px #f4f1ea, 0 0 10px #f4f1ea;
     }
@@ -893,7 +895,7 @@
       .xp-about__bio { gap: 10px; }
       .xp-about__bio p { font-size: 12px; line-height: 1.6; }
       .xp-about__bio-en { gap: 7px; }
-      .xp-about__bio-en p { font-size: 10.5px; line-height: 1.55; }
+      .xp-about__bio-en p { font-size: 11.5px; line-height: 1.6; }
       /* 展示歴はモバイルでは省く。スクロール無しで画面に収めるための
          コンテンツ量調整で、バイオ本文を優先する */
       .xp-about__exhibitions { display: none; }
