@@ -2071,24 +2071,39 @@ const OPENING_COPY = {
   t: 0.0,
 };
 
-/* 谷の詩：情景と情景の"あいだ"、霧が閉じて何も見えない渡りにだけ漂う1行。
+/* 谷の詩：情景と情景の"あいだ"、霧が閉じて何も見えない渡りにだけ漂う。
    opacity = near^1.25 * (veil / 0.85) なので、霧が晴れている情景の中では
    数式上ゼロになり、渡りの最中にしか現れない。
 
-   情景は8つ＝渡りは7区間あるが、置いてあるのは3つだけ。
-   ARCHITECTURES→SNAPS→ABSTRACTS→EXHIBITIONS の3連続が無言になるので、
-   ここは埋める余地がある。ただし埋めるのは撮影者の言葉でなければならない。
+   行き先には触れない。渡っている最中の状態だけを書く。行き先を示すと
+   霧が「通過すべき廊下」になり、読み手が先を急いで同じ長さの時間が
+   長く感じられる。現在地と全体像はドットの現在地ラベルと 03 / 08 が
+   担っているので、ここで案内をするとUIとして二重にもなる。
 
-   一度この4区間に代筆を入れたが、全部が「次に何が来るか」を示す
-   案内標識になっていて撤回した（0.3255「足もとから、目が遠くなる。」＝
-   近景から遠景へ、0.5605「線がほどけて、人の音がする。」＝建築から
-   スナップへ、というように、行き先の説明でしかなかった）。
-   下の3行はどれも行き先に触れていない。渡っている最中の状態だけを書き、
-   読み手を先へ急がせない。それがこの位置のコピーの役目。 */
+   組みは情景コピー（xp-copy）に合わせ、縦組みの和文の下に罫線＋横組みの
+   英訳を添える。t は各情景の中間地点。 */
 const VALLEY_LINES = [
-  { t: 0.209, text: "まだ名前のない風景へ。" },      /* ABOUT → PLANTS */
-  { t: 0.443, text: "見えない時間が、目を澄ませる。" },/* LANDSCAPES → ARCHITECTURES */
-  { t: 0.912, text: "霧のむこうは、いつも明るい。" },  /* EXHIBITIONS → CONTACT */
+  /* ABOUT → PLANTS */
+  { t: 0.209,  jp: "まだ名前のない風景へ。",
+                en: "Toward a landscape not yet named." },
+  /* PLANTS → LANDSCAPES */
+  { t: 0.3255, jp: "白は、時間を測らない。",
+                en: "White does not keep time." },
+  /* LANDSCAPES → ARCHITECTURES */
+  { t: 0.443,  jp: "見えない時間が、目を澄ませる。",
+                en: "Unseen time clears the eye." },
+  /* ARCHITECTURES → SNAPS */
+  { t: 0.5605, jp: "静けさが、遠さをつくっている。",
+                en: "Stillness is making the distance." },
+  /* SNAPS → ABSTRACTS */
+  { t: 0.6775, jp: "かたちになる前の、あわい。",
+                en: "The interval before form." },
+  /* ABSTRACTS → EXHIBITIONS */
+  { t: 0.7945, jp: "見ないことで、近づいている。",
+                en: "By not looking, coming closer." },
+  /* EXHIBITIONS → CONTACT */
+  { t: 0.912,  jp: "霧のむこうは、いつも明るい。",
+                en: "Beyond the fog, it is always bright." },
 ];
 
 /* ABOUT：自己紹介カット（commonbyshokitago.com/about/ の本文をそのまま使用） */
@@ -2928,7 +2943,17 @@ if (document.fonts && document.fonts.ready) {
 VALLEY_LINES.forEach((v) => {
   const el = document.createElement("p");
   el.className = "valley-line";
-  el.textContent = v.text;
+  const jp = document.createElement("span");
+  jp.className = "valley-line__jp";
+  jp.textContent = v.jp;
+  el.appendChild(jp);
+  if (v.en) {
+    const en = document.createElement("span");
+    en.className = "valley-line__en";
+    en.lang = "en";
+    en.textContent = v.en;
+    el.appendChild(en);
+  }
   document.body.appendChild(el);
   v.el = el;
 });

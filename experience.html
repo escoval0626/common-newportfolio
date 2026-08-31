@@ -131,15 +131,33 @@
     /* ===== 谷の詩：霧が閉じた"何も見えない渡り"に、1行だけ漂う言葉 =====
        ヴェールの上に出るので白ハローは付けない（付けると野暮になる）。
        画面中央を外し、右寄り・やや上に置いて余白を残す。 */
+    /* 谷の詩。情景コピー（.xp-copy）と同じ組み方に揃える —— 縦組みの和文の
+       左に、罫線を挟んで横組みの英訳を添える。箱は縦組みなので、
+       和文を vertical-rl、英訳だけ horizontal-tb に戻して並べる */
     .valley-line {
       position: fixed; z-index: 5; pointer-events: none;
       right: clamp(10%, 15vw, 24%); top: 15%;
+      display: flex; align-items: flex-start; gap: clamp(12px, 1.2vw, 20px);
+      opacity: 0;
+      will-change: opacity;
+    }
+    .valley-line__jp {
       writing-mode: vertical-rl; text-orientation: mixed;
       font-family: var(--font-jp); font-weight: 400;
       font-size: clamp(16px, 1.45vw, 21px); letter-spacing: 0.22em; line-height: 1;
       color: #4a453d;
-      opacity: 0;
-      will-change: opacity;
+    }
+    /* 縦組みの隣なので、罫線は上ではなく右側に立てる */
+    .valley-line__en {
+      writing-mode: horizontal-tb;
+      max-width: clamp(120px, 11vw, 168px);
+      font-family: var(--font-latin); font-weight: 300;
+      font-size: clamp(9.5px, 0.78vw, 11.5px); letter-spacing: 0.16em;
+      line-height: 1.85; text-transform: uppercase;
+      color: #6a655c;
+      border-right: 1px solid rgba(30,26,20,0.22);
+      padding-right: clamp(12px, 1.2vw, 20px);
+      order: -1;   /* 縦組みは右から読むので、英訳は左に置く */
     }
 
     /* ===== 絵→写真の遷移：写真は"素"で立ち上がる（紙・霧・LUTを一切乗せない） ===== */
@@ -970,10 +988,22 @@
       .hud__social-link { width: 44px; height: 44px; }
 
       /* 縦書き1行が画面の高さを超えるため、横書きに切り替えて中央寄せ */
+      /* 縦組み1行が画面の高さを超えるため、横組みに切り替えて中央寄せ。
+         罫線も右側ではなく上へ回す */
       .valley-line {
-        writing-mode: horizontal-tb; right: auto;
-        left: 50%; transform: translateX(-50%); top: 12%;
+        right: auto; left: 50%; transform: translateX(-50%); top: 12%;
+        flex-direction: column; align-items: center; gap: 10px;
+        max-width: 84vw;
+      }
+      .valley-line__jp {
+        writing-mode: horizontal-tb;
         font-size: 15px; letter-spacing: 0.16em; text-align: center;
+      }
+      .valley-line__en {
+        order: 0; max-width: 100%; text-align: center;
+        border-right: 0; padding-right: 0;
+        border-top: 1px solid rgba(30,26,20,0.22); padding-top: 10px;
+        font-size: 9.5px; letter-spacing: 0.14em;
       }
     }
     /* タッチ端末はホバー状態が「タップ後に張り付く」挙動になりやすいので、
