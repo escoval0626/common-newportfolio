@@ -3679,6 +3679,7 @@ function openZoom(mesh) {
   /* SNSの円は閉じるボタンと重なる位置にあり、390px幅では実際に衝突して
      いた。閉じるつもりで外部サイトへ飛ぶ誤操作を防ぐため一緒に退場させる */
   if (socialEl) { socialEl.classList.add("is-zoom-hidden"); socialEl.inert = true; }
+  if (roomStrip) { roomStrip.classList.add("is-zoom-hidden"); roomStrip.inert = true; }
   /* モーダルとして扱う：背景（HUD・3Dアンカー群）をinertにしてTabが
      抜けないようにし、閉じるボタンへフォーカスを移す */
   zoomCap.setAttribute("aria-modal", "true");
@@ -3749,6 +3750,7 @@ function closeZoom() {
   const socialEl = document.querySelector(".hud__social");
   if (waveEl) waveEl.classList.remove("is-zoom-hidden");
   if (socialEl) { socialEl.classList.remove("is-zoom-hidden"); socialEl.inert = false; }
+  if (roomStrip) { roomStrip.classList.remove("is-zoom-hidden"); roomStrip.inert = false; }
   zoomCap.setAttribute("aria-modal", "false");
   zoomCap.setAttribute("aria-hidden", "true");
   if (hud) hud.inert = false;
@@ -3807,6 +3809,82 @@ function updateRoomCaption(hit, dt) {
    PC想定の減衰のままだと「指について来ない・もっさり」に感じられるため、
    タッチだけ追従を速める */
 const roomScroll = { current: 0, target: 0, ease: IS_TOUCH ? 0.16 : 0.07 };
+
+/* 部屋の一覧ストリップ。32点あるSNAPSでは1440px幅で同時に見えるのが
+   約1.5枚しかなく、端から端まで31ステップかかっていた。全体量と現在地を
+   一目で見せ、1タップで任意の1枚へ飛べるようにする。
+   画像は表示サイズに見合う派生（assets/photos/<series>/strip、1枚1.7KB）を使う。
+   thumb（41〜89KB）を並べるとSNAPSだけで1.56MB落ちることになる。 */
+const roomStrip = document.getElementById("roomStrip");
+let stripItems = [], stripIdx = -1;
+
+function stripUrl(url) {
+  const i = url.lastIndexOf("/");
+  return url.slice(0, i + 1) + "strip/" + url.slice(i + 1).replace(/\.jpe?g$/i, ".webp");
+}
+
+function buildRoomStrip(r) {
+  if (!roomStrip) return;
+  roomStrip.innerHTML = "";
+  stripItems = r.meshes.map((m, i) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "room-strip__item";
+    b.setAttribute("aria-label", (i + 1) + "枚目へ");
+    const img = document.createElement("img");
+    img.src = stripUrl(m.userData.url);
+    img.alt = "";
+    img.decoding = "async";
+    b.appendChild(img);
+    b.addEventListener("click", (e) => {
+      e.stopPropagation();
+      /* 読み込みが進むたびに列を開いた位置へ引き戻す snapPending は、
+         自分で動かした時点で解除する約束になっている（2356行付近と同じ）。
+         ここで解除しないと、飛んだ先からすぐ先頭へ戻されてしまう */
+      r.snapPending = false;
+      roomScroll.target = r.offsetOf(i);
+    });
+    roomStrip.appendChild(b);
+    return b;
+  });
+  stripIdx = -1;
+  roomStrip.setAttribute("aria-hidden", "false");
+  roomStrip.classList.add("is-visible");
+}
+
+function clearRoomStrip() {
+  if (!roomStrip) return;
+  roomStrip.classList.remove("is-visible", "is-zoom-hidden");
+  roomStrip.setAttribute("aria-hidden", "true");
+  roomStrip.innerHTML = "";
+  stripItems = [];
+  stripIdx = -1;
+}
+
+/* 現在地の更新。列の位置（roomScroll.current）に最も近い1枚を選ぶ。
+   選ばれた項目が枠の外にあれば、ストリップ自身も横に送って見せる */
+function updateRoomStrip(r) {
+  if (!stripItems.length || !r || !r.positions) return;
+  let idx = 0, best = Infinity;
+  for (let i = 0; i < r.positions.length; i++) {
+    const d = Math.abs((r.positions[i] || 0) - roomScroll.current);
+    if (d < best) { best = d; idx = i; }
+  }
+  if (idx === stripIdx) return;
+  stripIdx = idx;
+  stripItems.forEach((b, i) => {
+    const on = i === idx;
+    b.classList.toggle("is-current", on);
+    b.setAttribute("aria-current", on ? "true" : "false");
+  });
+  const el = stripItems[idx];
+  if (el) {
+    const sl = roomStrip.scrollLeft, w = roomStrip.clientWidth;
+    const l = el.offsetLeft, rr = l + el.offsetWidth;
+    if (l < sl + 24) roomStrip.scrollTo({ left: Math.max(0, l - 24), behavior: "smooth" });
+    else if (rr > sl + w - 24) roomStrip.scrollTo({ left: rr - w + 24, behavior: "smooth" });
+  }
+}
 let activeRoom = null;
 /* ?debug=1 のときだけ内部状態を覗けるようにする（挙動の切り分け用） */
 if (DEV_TOOLS_ALLOWED && new URLSearchParams(location.search).get("debug") === "1") {
@@ -3848,6 +3926,7 @@ const _rv = new THREE.Vector3();
 function updateRoom(dt) {
   if (!activeRoom) return;
   const r = activeRoom;
+  updateRoomStrip(r);   /* 一覧の現在地。列が動いた分だけ追従させる */
   /* 1枚を見ている間は列を動かさない（横に流れると見ている物が逃げる） */
   if (!r.zoomed) {
     /* ±span（板の総幅の半分）だと最後の1枚を正面に置いた先にも
@@ -3979,6 +4058,7 @@ function openGallery(area) {
   hint.classList.remove("is-faded");
   roomBack.classList.add("is-visible");
   hud.classList.add("is-room");   /* 部屋の中だけ効かせたいCSSのための状態 */
+  buildRoomStrip(room);           /* 全体量と現在地を出す一覧 */
   roomBack.tabIndex = 0; /* 非表示中はTab順から外している。表示に合わせて戻す */
   roomBack.focus(); /* キーボード操作の起点を、旅の外へ戻れるこのボタンに置く */
   transitionActive = true;
@@ -4049,6 +4129,7 @@ function closeGallery(instant = false) {
   hint.classList.add("is-faded");
   roomBack.classList.remove("is-visible");
   hud.classList.remove("is-room");
+  clearRoomStrip();
   roomBack.tabIndex = -1; /* 見えないボタンにTabで止まり、Enterで意図せず旅の外へ出てしまうのを防ぐ */
   /* 部屋に入る前にフォーカスしていた場所（ホットスポット等）へ戻す。
      その要素が消えている場合（ドット操作等）は無理に追わず諦める */
