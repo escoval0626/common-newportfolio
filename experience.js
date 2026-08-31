@@ -2848,6 +2848,11 @@ function addAboutBox(area) {
 
   bioRow.appendChild(bioEn);
   el.appendChild(bioRow);
+  /* 狭い幅ではこの箱だけ内部スクロールになる。下に続きがあることを示す */
+  const more = document.createElement("div");
+  more.className = "xp-about__more";
+  more.setAttribute("aria-hidden", "true");
+  el.appendChild(more);
 
   anchorsWrap.appendChild(el);
   const dir = area.center.clone().sub(area.viewPos).normalize();
@@ -2945,7 +2950,21 @@ VALLEY_LINES.forEach((v) => {
   el.className = "valley-line";
   const jp = document.createElement("span");
   jp.className = "valley-line__jp";
-  jp.textContent = v.jp;
+  /* 狭い幅では和文が2行に折り返るが、日本語は分かち書きしないので
+     ブラウザ任せだと「や／わらかい」「追い／ついてくる」のように
+     語の途中で割れる。読点で明示的に割る（旧サイトの2行組と同じ）。
+     縦組みのデスクトップでは <br> が新しい列を作ってしまうので、
+     CSS側で display:none にして1列のまま見せる */
+  const cut = v.jp.indexOf("、");
+  if (cut > 0) {
+    jp.appendChild(document.createTextNode(v.jp.slice(0, cut + 1)));
+    const br = document.createElement("br");
+    br.className = "valley-line__br";
+    jp.appendChild(br);
+    jp.appendChild(document.createTextNode(v.jp.slice(cut + 1)));
+  } else {
+    jp.textContent = v.jp;
+  }
   el.appendChild(jp);
   if (v.en) {
     const en = document.createElement("span");
@@ -4590,8 +4609,13 @@ function updateHud(capArea, capW) {
       /* ABOUTは日英バイオだけで画面の高さいっぱいまで伸びるモバイル幅では、
          左下固定のこの見出しが本文の末尾（英語バイオ）に重なって埋もれていた。
          他のエリアは短いのでこの見出しだけが頼りだが、ABOUTは名前・肩書きが
-         本文内に既にあるため無くても迷わない */
-      caption.classList.toggle("is-visible", !(innerWidth <= 767 && active.isAbout));
+         本文内に既にあるため無くても迷わない。
+         CONTACT も同じ。375x667 実測で、この見出し（[20,554,164,589]）が
+         ホットスポットの "escoval0626@gmail.com — Say hello"（[11,547,364,571]）と
+         144x17px 重なっていた。本文側に既に「Contact.」の見出しがあるので、
+         ここでも大見出しは無くて迷わない */
+      const hideCap = innerWidth <= 767 && (active.isAbout || active.name === "CONTACT");
+      caption.classList.toggle("is-visible", !hideCap);
     } else {
       caption.classList.remove("is-visible");
     }

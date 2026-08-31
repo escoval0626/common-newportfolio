@@ -141,6 +141,8 @@
       opacity: 0;
       will-change: opacity;
     }
+    /* 縦組みでは <br> が新しい列を作ってしまうので、1列のまま見せる */
+    .valley-line__br { display: none; }
     .valley-line__jp {
       writing-mode: vertical-rl; text-orientation: mixed;
       font-family: var(--font-jp); font-weight: 400;
@@ -737,6 +739,8 @@
     /* ===== ABOUT：自己紹介カット（名前・肩書＋長文バイオ＋展示歴）
        他の情景と同じ「箱を作らず、白ハローで空間に浮かせる」方式に統一 ===== */
     .xp-copy--about { gap: 0; width: min(640px, 90vw); }
+    /* 内部スクロールになるのは狭い幅だけなので、既定では出さない */
+    .xp-about__more { display: none; }
     .xp-about__name {
       font-family: var(--font-jp); font-weight: 500;
       font-size: 18px; letter-spacing: 0.1em; color: #16130f;
@@ -924,9 +928,20 @@
          箱の高さに上限を設け、超えた分は箱の中だけでスクロールさせる */
       .xp-copy--about {
         width: 86vw;
-        max-height: 52vh;
+        /* 52vh だと iPhone SE(667px) で表示高347pxに対して中身が616pxあり、
+           英訳の列は箱内353pxから始まる＝表示領域の外に完全に隠れていた。
+           スクロールできる合図も無いので「英訳が無い」ように見えていた。
+           英訳の1段落目までは開いた時点で見えるところまで上げる */
+        max-height: 66vh;
         overflow-y: auto;
         -webkit-overflow-scrolling: touch;
+      }
+      /* まだ下に続いていることを示す。sticky なので中身と一緒に流れず、
+         箱の下端に貼り付いたまま残る */
+      .xp-about__more {
+        display: block; position: sticky; bottom: -1px;
+        height: 34px; margin-top: -34px; pointer-events: none;
+        background: linear-gradient(to top, #f4f1ea 10%, rgba(244,241,234,0) 100%);
       }
       .xp-about__bio-row { flex-direction: column; }
       .xp-about__bio-en {
@@ -956,6 +971,10 @@
       /* タッチ環境ではJSがhintを1行(高さ17px)に差し替えるため、2行前提の64pxは
          過剰だった。hint上端(26+17=43px)の上に載る位置へ。safe-areaも同じ基準で足す */
       .hud__wave { bottom: calc(50px + env(safe-area-inset-bottom, 0px)); }
+      /* 部屋ではヒントが2行（SWIPE — 流す ／ TAP — 大きく見る）になり、
+         波マークが1行目に重なって両方読めなくなっていた。
+         波は旅の「流れている」印で、部屋ではヒントが同じことを言っている */
+      .hud.is-room .hud__wave { opacity: 0; }
       /* 狭い幅では枚数ぶん横に長くなるので、画面いっぱいまで使う */
       .room-strip {
         bottom: calc(76px + env(safe-area-inset-bottom, 0px));
@@ -1030,7 +1049,10 @@
       .valley-line__jp {
         writing-mode: horizontal-tb;
         font-size: 15px; letter-spacing: 0.16em; text-align: center;
+        line-height: 1.75;
       }
+      /* 横組みでは読点で割る。語の途中で折り返るのを防ぐ */
+      .valley-line__br { display: inline; }
       .valley-line__en {
         order: 0; max-width: 100%; text-align: center;
         border-right: 0; padding-right: 0;
