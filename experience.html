@@ -662,16 +662,24 @@
       display: flex; flex-direction: row-reverse; align-items: flex-start;
       gap: 0.55em;
     }
+    /* 3Dアンカーに載る文字は、これまで全部固定pxで、拡縮は距離依存の
+       clamp(6.4/d, 0.82, 1.08) だけだった。そのため 1280 と 1920 で
+       font-size の実測値が完全に同一になり、広い画面ほど本文だけが
+       取り残されて、余白ではなく「埋まっていない」ように見えていた
+       （ヒーロー題字は clamp(52px, 8vw, 112px) で伸びる）。
+       サイト側の書き方に揃えて可変にする。現在値を下限に置いてあるので
+       1280 以下は一切変わらず、広い画面でだけ 2 割強まで伸びる。
+       モバイル（767px以下）は既存の上書きが後勝ちするので影響しない。 */
     .xp-copy__col {
       writing-mode: vertical-rl; text-orientation: mixed;
       font-family: var(--font-jp); font-weight: 500;
-      font-size: 25px; letter-spacing: 0.16em; line-height: 1;
+      font-size: clamp(25px, 1.95vw, 30.5px); letter-spacing: 0.16em; line-height: 1;
       color: #16130f; white-space: nowrap;
       text-shadow: 0 0 6px #f2efe8, 0 0 12px #f2efe8, 0 0 3px #f2efe8, 0 1px 2px rgba(242,239,232,0.9);
     }
     .xp-copy__en {
       font-family: var(--font-latin); font-weight: 400;
-      font-size: 12.5px; letter-spacing: 0.16em; text-transform: uppercase;
+      font-size: clamp(12.5px, 0.98vw, 15px); letter-spacing: 0.16em; text-transform: uppercase;
       color: #322e28; white-space: nowrap;
       padding-left: 0.2em; border-top: 1px solid rgba(30,26,20,0.28); padding-top: 10px;
       /* 絵の上でも読めるよう白ハローを強めに */
@@ -732,7 +740,7 @@
     }
     .xp-about__bio p {
       font-family: var(--font-jp); font-weight: 500;
-      font-size: 12px; line-height: 1.95; letter-spacing: 0.03em;
+      font-size: clamp(12px, 0.94vw, 14.5px); line-height: 1.95; letter-spacing: 0.03em;
       color: #16130f;
       text-shadow: 0 0 6px #f2efe8, 0 0 12px #f2efe8, 0 0 3px #f2efe8, 0 1px 2px rgba(242,239,232,0.9);
     }
@@ -743,7 +751,7 @@
     }
     .xp-about__bio-en p {
       font-family: var(--font-latin); font-weight: 300;
-      font-size: 10.5px; line-height: 1.85; letter-spacing: 0.015em;
+      font-size: clamp(10.5px, 0.82vw, 12.5px); line-height: 1.85; letter-spacing: 0.015em;
       color: #3a362f;
       text-shadow: 0 0 5px #f4f1ea, 0 0 10px #f4f1ea, 0 0 2px #f4f1ea, 0 1px 1px rgba(244,241,234,0.95);
     }
@@ -752,21 +760,21 @@
       border-top: 1px solid rgba(30,26,20,0.24);
     }
     .xp-about__exhibitions h4 {
-      font-family: var(--font-latin); font-weight: 400; font-size: 9.5px;
+      font-family: var(--font-latin); font-weight: 400; font-size: clamp(9.5px, 0.74vw, 11.5px);
       letter-spacing: 0.28em; text-transform: uppercase; color: #6a655c;
       text-shadow: 0 0 6px #f2efe8, 0 0 10px #f2efe8;
       margin-bottom: 10px;
     }
     .xp-about__exhibitions ul { list-style: none; }
     .xp-about__exhibitions li {
-      font-family: var(--font-jp); font-weight: 500; font-size: 12px; letter-spacing: 0.03em;
+      font-family: var(--font-jp); font-weight: 500; font-size: clamp(12px, 0.94vw, 14.5px); letter-spacing: 0.03em;
       color: #16130f; line-height: 1.65; margin-bottom: 7px;
       text-shadow: 0 0 6px #f2efe8, 0 0 12px #f2efe8, 0 0 3px #f2efe8, 0 1px 2px rgba(242,239,232,0.9);
     }
     .xp-about__exhibitions li:last-child { margin-bottom: 0; }
     .xp-about__exhibitions li em {
       display: block; font-style: normal;
-      font-family: var(--font-latin); font-weight: 300; font-size: 9.5px; letter-spacing: 0.05em;
+      font-family: var(--font-latin); font-weight: 300; font-size: clamp(9.5px, 0.74vw, 11.5px); letter-spacing: 0.05em;
       color: #6a655c; margin-top: 2px;
       text-shadow: 0 0 5px #f4f1ea, 0 0 10px #f4f1ea;
     }
