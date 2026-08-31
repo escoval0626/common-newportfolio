@@ -1959,7 +1959,12 @@ const AREAS = [
     center: new THREE.Vector3(7.5, 1.3, -112),
     viewPos: new THREE.Vector3(2.3, 1.6, -107),
     gesture: { dy: 0.3, lookDy: 0.15 }, /* 展示室に足を踏み入れ、静かに全体を見渡す */
-    hotspot: "View the series",
+    /* ここだけ中身が「作品群」ではなく「公に出した2点の記録」で、
+       他の5シリーズ（8〜32点）と分類の軸が違う。ラベルまで
+       "View the series" だと、シリーズを期待して開いて2枚で終わる。
+       枚数を先に言って、記録として受け取ってもらう */
+    hotspot: "Two works, shown",
+    hotspotAria: "出展・受賞した2点を見る",
     lines: ["見せることは、", "選び、手放すこと。"],
     /* 北郷さんの実写。題は1枚ずつ実物を見て付けている。
        3枠目（受賞歴）は、その作品が実際に選ばれた展示・コンテスト。
@@ -2842,7 +2847,7 @@ AREAS.forEach((area) => {
      なり、下線が不安定に伸び縮みして見えてしまう。実用的なメールリンクなので
      装飾より安定を優先し、揺れを止めた静的な下線にする */
   if (area.name === "CONTACT") el.classList.add("xp-hotspot--static");
-  el.setAttribute("aria-label", area.link ? area.hotspot : `${area.name} シリーズを見る`);
+  el.setAttribute("aria-label", area.link ? area.hotspot : (area.hotspotAria || `${area.name} シリーズを見る`));
   el.innerHTML =
     `<span class="xp-hotspot__bullet">・</span>` +
     `<span class="xp-hotspot__label">${area.hotspot}</span>` +
