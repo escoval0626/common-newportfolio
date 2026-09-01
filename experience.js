@@ -126,7 +126,18 @@ const BG = new THREE.Color("#eeedea");
 const PIXEL_BUDGET = 3.6e6;
 let qualityScale = 1;
 const dustMats = []; /* 点の大きさは実解像度に追従させる必要がある */
+/* 拡大表示の間だけ立てる。activeRoom は宣言がずっと後ろなので、
+   fitPixelRatio から直接参照すると初期化前アクセスになりうる */
+let zoomFullRes = false;
 function fitPixelRatio() {
+  if (zoomFullRes) {
+    /* 拡大表示は板1枚とテクスチャだけで、旅の最中のような半透明粒子の
+       塗り重ねが無い（実測: 拡大 draw 34 / pts 1259 に対し 旅 draw 181）。
+       上の 1.25 上限は粒子のための制限で、ここでは払う必要が無い。
+       写真家のポートフォリオで作品を見せる主画面が、素の <img> より
+       線形解像度で約6割にしかならないのは本末転倒なので、ここだけ上げる */
+    return Math.min(window.devicePixelRatio || 1, 2);
+  }
   const base = Math.min(window.devicePixelRatio || 1, 1.25);
   const area = innerWidth * innerHeight * base * base;
   const k = area > PIXEL_BUDGET ? Math.sqrt(PIXEL_BUDGET / area) : 1;
@@ -3724,6 +3735,7 @@ function openZoom(mesh) {
   zoomTl.to(r.backdrop.material, { opacity: 0.94, duration: 0.8, ease: "power2.out" }, 0);
   bringToFront(mesh, zoomTl, 0, 1.05);
   setSiblingOpacity(r, mesh, zoomTl, 0);   /* 拡大する1枚以外を伏せる */
+  zoomFullRes = true; applyPixelRatio();   /* 作品を見せる画面だけ実解像度で描く */
   zoomTl
     .to(zoomCap, { opacity: 1, duration: 0.5 }, 0.42)
     .fromTo(spans, { yPercent: 120 }, { yPercent: 0, duration: 0.85, stagger: 0.07 }, 0.42);
@@ -3796,6 +3808,7 @@ function closeZoom() {
   zoomTl
     .to(zoomCap, { opacity: 0, duration: 0.3, ease: "power2.in" }, 0)
     .to(r.backdrop.material, { opacity: 0, duration: 0.6 }, 0.1);
+  zoomFullRes = false; applyPixelRatio(); /* 旅へ戻るので粒子向けの上限に戻す */
   setSiblingOpacity(r, null, zoomTl, 0);   /* 読み込み済みの板を戻す */
   returnToWall(mesh, zoomTl, 0, 0.85);
   if (REDUCE_MOTION) zoomTl.timeScale(6);
