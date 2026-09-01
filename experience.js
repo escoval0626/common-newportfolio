@@ -1892,42 +1892,50 @@ const AREAS = [
     viewPos: new THREE.Vector3(1.6, 1.6, -75),
     gesture: { dy: -0.15, lookDy: 0.25 }, /* 水平線へ向かって真っ直ぐ吸い込まれる */
     hotspot: "View the series",
-    lines: ["街の雑踏に、", "一瞬だけ立ち止まる光がある。"],
-    /* 北郷さんの実写。題は1枚ずつ実物を見て付けている */
+    lines: ["通りすがりに見たものが、", "いちばん長く残る。"],
+    /* 北郷さんの実写。題は1枚ずつ実物を見て付けている。
+       2026-09、32点から16点へ絞った。残したのは「無人の場所と、そこを
+       通り過ぎる人」の一群 — 誰もいないブランコ、誰もいない会衆席、
+       ランプの下に残されたグラス、スクリーンに落ちた人影、長時間露光で
+       溶けた通行人。32点のままだと街・記録・人物が混ざり、この主題が
+       「たまたま撮れた霧の写真」に見えてしまっていた。 */
     photos: [
-      ["assets/photos/snaps/snaps-01.jpg", "Gull Over Surf"],
       ["assets/photos/snaps/snaps-02.jpg", "Empty Swings"],
       ["assets/photos/snaps/snaps-03.jpg", "Wind Chime, Glass"],
       ["assets/photos/snaps/snaps-04.jpg", "Wires in Fog"],
       ["assets/photos/snaps/snaps-05.jpg", "Pier at Dusk"],
-      ["assets/photos/snaps/snaps-06.jpg", "Hand on a Shoulder"],
-      ["assets/photos/snaps/snaps-07.jpg", "Horse, Overcast Field"],
-      ["assets/photos/snaps/snaps-08.jpg", "One Plane, Many Clouds"],
-      ["assets/photos/snaps/snaps-09.jpg", "Departure Lounge"],
-      ["assets/photos/snaps/snaps-10.jpg", "Apples on the Branch"],
       ["assets/photos/snaps/snaps-11.jpg", "Empty Pews"],
-      ["assets/photos/snaps/snaps-12.jpg", "Mixing Desk"],
-      ["assets/photos/snaps/snaps-13.jpg", "Two Benches, One Walk"],
       ["assets/photos/snaps/snaps-14.jpg", "Gull on Still Water"],
-      ["assets/photos/snaps/snaps-15.jpg", "Child in Overalls"],
-      ["assets/photos/snaps/snaps-16.jpg", "Posters, After Dark"],
-      ["assets/photos/snaps/snaps-17.jpg", "Blue Bench, Leaf Shadow"],
-      ["assets/photos/snaps/snaps-18.jpg", "One Chair"],
       ["assets/photos/snaps/snaps-19.jpg", "Glass Under Lamplight"],
-      ["assets/photos/snaps/snaps-20.jpg", "Through the Window"],
       ["assets/photos/snaps/snaps-21.jpg", "Bokeh on Stems"],
       ["assets/photos/snaps/snaps-22.jpg", "Leaves on Glass"],
-      ["assets/photos/snaps/snaps-23.jpg", "Web in the Mist"],
       ["assets/photos/snaps/snaps-24.jpg", "Shadow on the Screen"],
       ["assets/photos/snaps/snaps-25.jpg", "Afternoon, Three Generations"],
       ["assets/photos/snaps/snaps-26.jpg", "Poles into Fog"],
-      ["assets/photos/snaps/snaps-27.jpg", "The Museum Is Not Enough"],
       ["assets/photos/snaps/snaps-28.jpg", "Passing, Long Exposure"],
       ["assets/photos/snaps/snaps-29.jpg", "Crossing, Old Street"],
       ["assets/photos/snaps/snaps-30.jpg", "Waiting by the Window"],
-      ["assets/photos/snaps/snaps-31.jpg", "Grass and Standing Water"],
       ["assets/photos/snaps/snaps-32.jpg", "Calf in the Fog"],
     ],
+    /* 外した16点。ファイルは assets/photos/snaps/ に残してあるので、
+       上の配列に行を戻すだけで復帰できる。
+       01 Gull Over Surf
+       06 Hand on a Shoulder
+       07 Horse, Overcast Field
+       08 One Plane, Many Clouds
+       09 Departure Lounge
+       10 Apples on the Branch
+       12 Mixing Desk
+       13 Two Benches, One Walk
+       15 Child in Overalls
+       16 Posters, After Dark
+       17 Blue Bench, Leaf Shadow
+       18 One Chair
+       20 Through the Window
+       23 Web in the Mist
+       27 The Museum Is Not Enough
+       31 Grass and Standing Water
+    */
     /* コラージュ確定：B案「無人の情景」（桟橋は使わない）
        霧の電柱道(縦)を主役に、誰もいないブランコ(縦)を右奥に添える静かな構成。 */
     build() {
@@ -2147,7 +2155,7 @@ const ABOUT_BIO = {
    同じ写真・キャプションを通常のHTML（img alt + figcaption）として
    もう1系統、独立に用意する。画面には出さない（.sr-only）が、
    3D側のensureRoomTexture（正面付近だけ実体化するウィンドウ方式）を
-   バイパスして全98枚を一括ダウンロードしないよう loading="lazy" にする。
+   バイパスして全82枚を一括ダウンロードしないよう loading="lazy" にする。
    ページ表示直後にこのCanvas外の要素まで先読みされることはない */
 function buildStaticGallery() {
   const root = document.getElementById("staticGallery");
@@ -2700,7 +2708,7 @@ const COPY_EN = {
   PLANTS: "The quietest subject — the most eloquent life.",
   LANDSCAPES: "Only where no one stands does the landscape appear.",
   ARCHITECTURES: "Within straight lines, a search for human prayer.",
-  SNAPS: "In the city's clamor, a light that pauses for an instant.",
+  SNAPS: "What I saw only in passing is what stays the longest.",
   ABSTRACTS: "Past where the outline comes undone, the true shape waits.",
   EXHIBITIONS: "To show something is to choose, and to let go.",
   CONTACT: "At the journey's end, a seed falls once more. Someday, somewhere.",
