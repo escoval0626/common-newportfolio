@@ -3210,6 +3210,9 @@ function makeRoomPhotoMat(tex) {
       /* 極端な縦長・横長は表示上のプリント幅をクランプするので、
          そのぶん像側は中心から拡大してクロップする（対象そのものは歪めない） */
       uCrop: { value: new THREE.Vector2(1, 1) },
+      /* 像を一回り内側に取るための余白。壁ではパララックスの逃げ場として
+         要るが、拡大して1枚だけ見せる時は端まで見せたいので 1.0 へ開く */
+      uInset: { value: 0.9 },
     },
     vertexShader: /* glsl */ `
       varying vec2 vUv;
@@ -3226,6 +3229,7 @@ function makeRoomPhotoMat(tex) {
       uniform vec4 uPrint, uPhoto;   /* 板の中での矩形（lo.xy, hi.xy） */
       uniform vec3 uBg, uPaper, uShadow;
       uniform vec2 uCrop;
+      uniform float uInset;
       varying vec2 vUv;
 
       /* 矩形までの符号付き距離。内側が負になるので、境界の太さが測れる */
@@ -3266,18 +3270,30 @@ function makeRoomPhotoMat(tex) {
 
         /* 像。一回り内側に取り、その余白の中でだけ流す＝端が破綻しない */
         vec2 f = (p - uPhoto.xy) / max(uPhoto.zw - uPhoto.xy, vec2(0.0001));
-        vec2 uv = (f - 0.5) * 0.9 * uCrop + 0.5;
-        uv.x += uParallax * 0.04;
-        uv -= (uMouse - 0.5) * 0.04 * uHover;   /* 枠の中の奥行き */
+        vec2 uv = (f - 0.5) * uInset * uCrop + 0.5;
+        /* 余白を使い切って流す。uInset が 1.0（拡大時）になると振れ幅は0になり、
+           サンプル範囲は端から端までになる。0.9 のままだと四辺5%＝面積の19%が
+           永久に切れたままで、uCrop を (1,1) へ戻しても解けなかった。
+           写真家にとって画面の端は構図そのもの */
+        float pan = (1.0 - uInset) * 10.0;
+        uv.x += uParallax * 0.04 * pan;
+        uv -= (uMouse - 0.5) * 0.04 * uHover * pan;   /* 枠の中の奥行き */
         float dm = distance(vUv, uMouse);
         float circle = smoothstep(0.55, 0.0, dm);
-        uv += (uMouse - vUv) * 0.04 * circle * uHover;
-        vec3 img = srgbToLinear(texture2D(uTex, clamp(uv, 0.0, 1.0)).rgb);
-        /* 露出を持ち上げる（紙・影には掛けず、写真本体だけ）。
-           乗算だけだとハイライトから飽和するので、暗部を持ち上げる補正も併用する。
-           元の値（0.82 / 1.15→0.75 / 1.22→0.70 / 1.27）から、
-           まだ暗いとの指摘を受けさらにもう一段明るく */
-        img = pow(img, vec3(0.64)) * 1.33;
+        uv += (uMouse - vUv) * 0.04 * circle * uHover * pan;
+        /* WebGL2 では colorSpace = SRGBColorSpace のテクスチャは内部形式が
+           SRGB8_ALPHA8 になり、texture2D はサンプル時点で既にリニアを返す
+           （sRGB 188 を入れて 128 が返ることを実測で確認）。
+           ここに srgbToLinear を掛けていたのは二重デコードで、実際の伝達関数は
+           出力 = 1.138 * EOTF(s)^0.64 になっていた。意図（持ち上げ）のほぼ逆で、
+           暗部が潰れ、入力233以上は255でクリップする。
+             入力  32 → 19 / 51 → 33 / 102 → 80 / 153 → 140 / 233 → 255
+           露出の 0.82/1.15 → 0.75/1.22 → 0.70/1.27 → 0.64/1.33 という3回の
+           引き上げは、この壊れた下流で明るさを追いかけた結果で、上げるほど
+           ハイライトのクリップだけが進んでいた。デコードを外した今、
+           階調は書き出したJPEGそのままになる（実測 102 → 102、153 → 152）。
+           下端のサムネイル（DOMの img）と壁の色が初めて一致する */
+        vec3 img = texture2D(uTex, clamp(uv, 0.0, 1.0)).rgb;
         img = linearToSrgb(img); /* ここでsRGB値に戻す。以降は他の色と同じ空間で混ぜる */
         img = mix(img, img * 1.06, circle * uHover);
 
@@ -3401,7 +3417,7 @@ function refitZoom(mesh) {
   const u = mesh.material.uniforms;
   /* 開く途中で届くこともある。同じプロパティを二重に動かさないよう、
      先に走っている tween を止めてから引き直す */
-  gsap.killTweensOf([mesh.position, mesh.scale, u.uPlane.value, u.uPrint.value, u.uPhoto.value, u.uCrop.value]);
+  gsap.killTweensOf([mesh.position, mesh.scale, u.uPlane.value, u.uPrint.value, u.uPhoto.value, u.uCrop.value, u.uInset]);
   bringToFront(mesh, gsap.timeline(), 0, 0.3);
 }
 
@@ -3679,7 +3695,9 @@ function bringToFront(mesh, tlLocal, at, dur) {
       x: (ROOM_PAD + EDGE) * k, y: (ROOM_PAD + EDGE_BOTTOM) * k,
       z: (ROOM_PAD + EDGE + pw2) * k, w: (ROOM_PAD + ROW_H - EDGE) * k, duration: dur,
     }, at)
-    .to(u.uCrop.value, { x: 1, y: 1, duration: dur }, at);
+    .to(u.uCrop.value, { x: 1, y: 1, duration: dur }, at)
+    /* 端まで見せる。パララックスの振れ幅も同時に0になる */
+    .to(u.uInset, { value: 1, duration: dur }, at);
 }
 
 /* 壁の元の場所へ返す */
@@ -3710,7 +3728,8 @@ function returnToWall(mesh, tlLocal, at, dur) {
         x: d.homeUniforms.photo.x, y: d.homeUniforms.photo.y,
         z: d.homeUniforms.photo.z, w: d.homeUniforms.photo.w, duration: dur,
       }, at)
-      .to(u.uCrop.value, { x: d.homeUniforms.crop.x, y: d.homeUniforms.crop.y, duration: dur }, at);
+      .to(u.uCrop.value, { x: d.homeUniforms.crop.x, y: d.homeUniforms.crop.y, duration: dur }, at)
+      .to(u.uInset, { value: 0.9, duration: dur }, at);
   }
   /* タイムライン登録時ではなく、実際に戻り切った時点で外す。
      クリックガード（locked中は開けない）と二重の保険にする */
