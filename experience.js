@@ -2922,8 +2922,16 @@ AREAS.forEach((area) => {
   /* 画面下部・詩コピーの下あたりに必ず収める。ここが唯一のクリック導線。
      CONTACTだけは詩＋「Contact.」＋本文2行で箱が飛び抜けて高く、既定の帯だと
      コピーの裾とメールリンクが重なって両方読めなくなるため、一段下げた帯に置く */
+  /* 帯（clampRect）は画面高に対する割合なので、画面が低いほど上に来る。
+     一方でコピーの箱は中身の実寸で決まり縮まないため、低い画面では
+     帯がコピーの裾に食い込む。iPhone SE の実効高 553px（Safari の
+     ツールバーぶんを引いた高さ）で、メール導線とリード文
+     「撮影のご依頼、それから、ものをつくる相談も。」が
+     240x24px 重なっていた（実測。667px では 29px 空いていて起きない）。
+     割合だけで決めず、同じエリアのコピー箱の実測下端も見て避ける */
+  const avoid = domAnchors.find((z) => z.area === area && !z.isHotspot) || null;
   domAnchors.push({
-    el, pos: hp, area, beatT: null, clamp: true, isHotspot: true,
+    el, pos: hp, area, beatT: null, clamp: true, isHotspot: true, avoid,
     clampRect: area.name === "CONTACT"
       ? { x0: 0.2, x1: 0.8, y0: 0.82, y1: 0.93 }
       : { x0: 0.2, x1: 0.8, y0: 0.72, y1: 0.88 },
@@ -3077,6 +3085,24 @@ function updateAnchors() {
         yLo = yHi = lo2 <= hi2 ? THREE.MathUtils.clamp(top, lo2, hi2) : innerHeight / 2;
       }
       y = THREE.MathUtils.clamp(y, yLo, yHi);
+
+      /* コピー箱の裾を実測して、そこより下へ逃がす。帯の方が既に下にある
+         （＝画面が十分高い）場合は Math.max が効かないので何も起きない。
+         画面下端は超えられないので、そこで頭打ちにする */
+      /* getBoundingClientRect はレイアウトを強制的に再計算させる。この
+         ループは毎フレーム全アンカーへ transform を書いているので、
+         書き→読み→書き→読み と交互になり本物のスラッシングになる。
+         コピー箱は同じループの手前で処理済みなので、その時の中心 y と
+         倍率を控えておけば DOM を読まずに裾が出せる（transform は
+         translate(-50%,-50%) なので y は中心、高さは baseH * scale） */
+      if (a.isHotspot && a.avoid && a.avoid._y != null && a.avoid.baseH && a.avoid._op > 0.02) {
+        const bottom = a.avoid._y + (a.avoid.baseH * a.avoid._scale) / 2;
+        const GAP = 10;
+        const capLo = hh + 8, capHi = innerHeight - hh - 8;
+        if (capLo <= capHi) {
+          y = THREE.MathUtils.clamp(Math.max(y, bottom + hh + GAP), capLo, capHi);
+        }
+      }
     }
     /* ピント面は「カメラが実際に見ている点」＝そのエリアの注視点に置く。
        以前は全エリア共通の固定距離だったため、寄りの強いカット（CONTACTの綿毛接写など）
@@ -3110,6 +3136,8 @@ function updateAnchors() {
       const w = a.area ? a.area.currentW : 1;
       proximity = Math.pow(THREE.MathUtils.clamp((w - 0.22) / 0.6, 0, 1), LINGER);
     }
+    /* 同フレームの後続アンカー（ホットスポット）が裾を知るために控える */
+    a._y = y; a._scale = scale; a._op = proximity;
     a.el.style.transform = `translate(-50%, -50%) translate(${x}px, ${y}px) scale(${scale})`;
     a.el.style.filter = `blur(${blur.toFixed(2)}px)`;
     a.el.style.opacity = (proximity * (rig.entered ? 1 : 0)).toFixed(2);
@@ -3967,7 +3995,7 @@ if (DEV_TOOLS_ALLOWED && new URLSearchParams(location.search).get("debug") === "
     gsap, bringToFront, ROW_H, EDGE, EDGE_BOTTOM, ROOM_PAD, openZoom, closeZoom,
     openGallery, closeGallery: () => closeGallery(), AREAS,
     camera, scene, THREE,
-    rig, updateRoom, artworks,
+    rig, updateRoom, artworks, frame, updateAnchors,
     ensureAreasAround, get buildOrder() { return buildOrder; },
     /* 実際に画面へ描かれている量を数える。推測で軽くしても意味がないので */
     stats() {
@@ -5139,7 +5167,11 @@ if (TRAILER) {
   }, 200);
 }
 
-renderer.setAnimationLoop(() => {
+/* 無名だと外から1フレームだけ進めることができない。名前を付けて
+   __xp から呼べるようにしておく。ヘッドレスや非表示タブでは
+   requestAnimationFrame も document.timeline も止まるため、
+   アンカーの座標やHUDの状態を実測する手段がこれしか無い */
+function frame() {
   if (contextLost) return;
   if (TRAILER) return; /* 撮影中は自前のループで進める */
   const dt = Math.min(0.05, clock.getDelta());
@@ -5183,7 +5215,8 @@ renderer.setAnimationLoop(() => {
   if (!rig.entered && loaderFluffRenderer) {
     loaderFluffRenderer.render(loaderFluffScene, camera);
   }
-});
+}
+renderer.setAnimationLoop(frame);
 
 /* CONTACT：近づくほど種から花が咲く（0→1へ成長、わずかに揺れる） */
 const contactArea = AREAS.find((a) => a.name === "CONTACT");
