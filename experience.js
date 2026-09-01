@@ -3786,7 +3786,7 @@ function closeZoom() {
     zoomCloseBtn.classList.remove("is-visible");
     zoomCloseBtn.tabIndex = -1;
   }
-  if (roomBack) roomBack.focus(); /* 部屋の中へ戻る。フォーカスの置き所として自然な導線 */
+  focusIfKeyboard(roomBack); /* 部屋の中へ戻る。キーボードで操作している時だけ */
   lockMesh(r, mesh); /* 戻り切るまでは毎フレーム処理に触らせない */
   if (zoomTl) zoomTl.kill();
   zoomTl = gsap.timeline({
@@ -3835,6 +3835,17 @@ function updateRoomCaption(hit, dt) {
    PC想定の減衰のままだと「指について来ない・もっさり」に感じられるため、
    タッチだけ追従を速める */
 const roomScroll = { current: 0, target: 0, ease: IS_TOUCH ? 0.16 : 0.07 };
+
+/* 直前の入力がキーボードだったか。部屋を開いた時・拡大を閉じた時に
+   フォーカスを BACK へ移すのは、キーボード操作の起点を作るためだが、
+   指で開いた時にも同じことをすると枠が出る。CSS は :focus-visible に
+   限定してあるものの、iOS Safari はプログラム的な focus() も
+   focus-visible とみなすため、タップしただけでボタンが四角く囲まれていた。
+   キーボードで開いた時だけ移す */
+let lastInputKeyboard = false;
+addEventListener("keydown", () => { lastInputKeyboard = true; }, true);
+addEventListener("pointerdown", () => { lastInputKeyboard = false; }, true);
+function focusIfKeyboard(el) { if (el && lastInputKeyboard) el.focus(); }
 
 /* 部屋の一覧ストリップ。32点あるSNAPSでは1440px幅で同時に見えるのが
    約1.5枚しかなく、端から端まで31ステップかかっていた。全体量と現在地を
@@ -4086,7 +4097,7 @@ function openGallery(area) {
   hud.classList.add("is-room");   /* 部屋の中だけ効かせたいCSSのための状態 */
   buildRoomStrip(room);           /* 全体量と現在地を出す一覧 */
   roomBack.tabIndex = 0; /* 非表示中はTab順から外している。表示に合わせて戻す */
-  roomBack.focus(); /* キーボード操作の起点を、旅の外へ戻れるこのボタンに置く */
+  focusIfKeyboard(roomBack); /* キーボード操作の起点。指で開いた時は枠を出さない */
   transitionActive = true;
   if (tl) tl.kill();
 
