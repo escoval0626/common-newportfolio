@@ -946,6 +946,14 @@
       .xp-about__more {
         display: block; position: sticky; bottom: -1px;
         height: 34px; margin-top: -34px; pointer-events: none;
+        /* 親は flex-direction:column。中身が max-height を超えると既定の
+           flex-shrink:1 が働き、中身を持たないこの div は min-content=0 まで
+           潰される。height:34px を書いても計算値は 0px になり、375x667 では
+           グラデーションが一度も描かれていなかった（実測：height 0 → 34px）。
+           スクロールできる唯一の合図なので、これが消えると英訳の列
+           （箱内 355px 以降・264px のうち 179px が折りたたみの外）が
+           「無くなった」ように見える */
+        flex-shrink: 0;
         background: linear-gradient(to top, #f4f1ea 10%, rgba(244,241,234,0) 100%);
       }
       .xp-about__bio-row { flex-direction: column; }
