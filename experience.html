@@ -864,7 +864,12 @@
     /* 1枚を大きく見ている間は、キャプションと同じ下部領域を使うので退く */
     .room-strip.is-zoom-hidden { opacity: 0; pointer-events: none; }
     .room-strip__item {
+      /* WCAG 2.5.8 (Target Size Minimum, AA) は 24x24 が下限。縦位置の写真は
+         見た目の幅が 20px しかなく、17件中11件が下限割れ、隣とのピッチも
+         23px しか無かった（実測）。ピッチが24px未満だと「間隔による例外」も
+         使えない。見た目は変えずに、当たり判定の箱だけ広げる */
       flex: 0 0 auto; padding: 0; border: 0; background: none; cursor: pointer;
+      min-width: 24px; display: flex; align-items: center; justify-content: center;
       height: 34px; line-height: 0;
       opacity: 0.38; filter: saturate(0.5);
       transition: opacity 0.3s, filter 0.3s, height 0.3s;
@@ -978,9 +983,10 @@
       /* 狭い幅では枚数ぶん横に長くなるので、画面いっぱいまで使う */
       .room-strip {
         bottom: calc(76px + env(safe-area-inset-bottom, 0px));
-        max-width: 100vw; gap: 3px; padding: 6px 12px;
+        /* 最小幅24px と合わせて、隣とのピッチを 29px 以上にする */
+        max-width: 100vw; gap: 5px; padding: 6px 12px;
       }
-      .room-strip__item { height: 30px; }
+      .room-strip__item { height: 30px; }   /* 高さは下限24pxを満たす */
       .room-strip__item.is-current { height: 40px; }
       /* 作品キャプションは左下、ヒントと波線は中央下。デスクトップでは横に
          離れているが、375px幅では作品名（"White Yarrow, Meadow"等）が2行に
