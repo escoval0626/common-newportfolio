@@ -895,6 +895,15 @@
     /* 1枚を大きく見ている間、zoom-capと同じ下部領域を使う波線・クレジットを退かす。
        特にモバイル幅ではこれらが zoom-cap のテキストと重なって読めなくなっていた */
     .hud__wave.is-zoom-hidden { opacity: 0; }
+    /* 旅の終端では波線と操作ヒントを退場させる。これは装飾ではなく案内で、
+       案内する先が無くなった時点で嘘になる。
+       375x553（iPhone SE の実効高。667px の CSS ビューポートから Safari の
+       ツールバーを引いた値）では、これが同時に場所も空ける：CONTACT の
+       箱は 438px あり、下に残るのは 115px しかない。そこへ
+       波線(489-503) / ヒント(510-527) / メール導線(514-538) が積まれ、
+       導線とヒントが 163x13px、波線と英文リードが 46x11px 重なっていた（実測） */
+    .hud.is-end .hud__wave,
+    .hud.is-end .hud__hint { opacity: 0; pointer-events: none; }
     /* c1e63e0 で「SNSの円が閉じるボタンと衝突する」指摘に対応した際、
        JS側（openZoom）で is-zoom-hidden を付けるところまでは入ったが、
        このCSSルールが書かれていなかった。socialEl.inert = true は効くので
@@ -1319,7 +1328,7 @@
     <div class="hud__caption" id="caption">
       <p class="hud__caption-num" id="captionNum"></p>
       <!-- 作品名が入るまでは空の見出しになるため、中身が入るまで隠す -->
-      <h2 class="hud__caption-title" id="captionTitle" aria-hidden="true"></h2>
+      <h2 class="hud__caption-title" id="captionTitle"></h2>
     </div>
     <div class="hud__dots" id="dots"></div>
     <!-- 部屋（下層ページ）の一覧ストリップ。32点あるSNAPSでは、1440px幅で
@@ -1328,6 +1337,9 @@
        画像は表示サイズに見合う派生（assets/photos/*/strip、1枚1.7KB）を使う。
        thumb（41〜89KB）をそのまま並べるとSNAPSだけで1.56MB落ちる -->
   <div class="room-strip" id="roomStrip" aria-hidden="true"></div>
+  <!-- 情景に着いたことを知らせる。画面では大見出しが担っているが、
+       読み上げには何も届いていなかった（#zoomLive は拡大表示専用） -->
+  <div class="sr-only" id="areaLive" aria-live="polite" aria-atomic="true"></div>
   <p class="hud__hint" id="hint"><span lang="en">SCROLL / DRAG</span> — 綿毛を追う</p>
     <div class="hud__wave" aria-hidden="true">
       <svg width="92" height="14" viewBox="0 0 92 14" fill="none" xmlns="http://www.w3.org/2000/svg">

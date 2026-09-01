@@ -1784,7 +1784,7 @@ const AREAS = [
       ["assets/photos/plants/plants-05.jpg", "Tulips, Dark Ground"],
       ["assets/photos/plants/plants-06.jpg", "Wild Daisies Adrift"],
       ["assets/photos/plants/plants-07.jpg", "Clematis Seed Head"],
-      ["assets/photos/plants/plants-08.jpg", "Pampas Grass Against the Sun"],
+      ["assets/photos/plants/plants-08.jpg", "Silver Grass Against the Sun"],
       ["assets/photos/plants/plants-09.jpg", "Dried Umbels, Sunset"],
       ["assets/photos/plants/plants-10.jpg", "Cosmos, Water Drops"],
       ["assets/photos/plants/plants-11.jpg", "Poppies, One Holding Still"],
@@ -3933,6 +3933,12 @@ function buildRoomStrip(r) {
     img.alt = "";
     img.decoding = "async";
     b.appendChild(img);
+    /* window 側の pointerdown/wheel が旅の移動と部屋のドラッグを拾うため、
+       素通しだとストリップを指でなぞるたびに奥の写真の列も一緒に流れ、
+       さらに updateRoomStrip の scrollTo({behavior:"smooth"}) と
+       取り合いになる。ABOUTの箱（addAboutBox）と同じ手当てをここにも入れる */
+    b.addEventListener("pointerdown", (e) => e.stopPropagation());
+    b.addEventListener("wheel", (e) => e.stopPropagation(), { passive: true });
     b.addEventListener("click", (e) => {
       e.stopPropagation();
       /* 読み込みが進むたびに列を開いた位置へ引き戻す snapPending は、
@@ -4479,6 +4485,7 @@ if (IS_TOUCH) hint.innerHTML = '<span lang="en">SWIPE</span> — 綿毛を追う
 const caption = document.getElementById("caption");
 const captionNum = document.getElementById("captionNum");
 const captionTitle = document.getElementById("captionTitle");
+const areaLive = document.getElementById("areaLive");
 const progressBar = document.getElementById("progressBar");
 const dotsWrap = document.getElementById("dots");
 
@@ -4677,6 +4684,12 @@ function updateHud(capArea, capW) {
   /* 部屋にいる間は情景の見出しを出さない。
      写真のキャプションと同じ左下に出るため、重なって読めなくなる */
   const active = (activeRoom || galleryOpen) ? null : (capArea && capW > 0.45 ? capArea : null);
+  /* 旅の終端。CONTACT は rig.target の上限（CONTACT_T = 0.97）なので、
+     ここから先へ進む余地は無い。それなのに波線は流れ続け、ヒントは
+     is-faded が外れるたび「SWIPE — 綿毛を追う」と復帰していた。
+     案内すべき先が無くなったら案内を下げる */
+  hud.classList.toggle("is-end",
+    !activeRoom && !galleryOpen && !!capArea && capArea.name === "CONTACT" && capW > 0.5);
   if (active !== shownArea) {
     shownArea = active;
     if (active) {
@@ -4694,8 +4707,19 @@ function updateHud(capArea, capW) {
          ここでも大見出しは無くて迷わない */
       const hideCap = innerWidth <= 767 && (active.isAbout || active.name === "CONTACT");
       caption.classList.toggle("is-visible", !hideCap);
+      /* 見出しは hideCap で消えることがあり、そもそも読み上げには
+         位置の変化そのものが届いていなかった。矢印キーだけで旅をすると
+         8区間ぜんぶ無音で、現在地を知る手段がドットへTabして
+         aria-current を聞くことしか無い */
+      if (areaLive) {
+        const idx = AREAS.indexOf(active);
+        areaLive.textContent = idx >= 0
+          ? active.name + "。" + AREAS.length + "区間中 " + (idx + 1) + " 番目。"
+          : active.name;
+      }
     } else {
       caption.classList.remove("is-visible");
+      if (areaLive) areaLive.textContent = "";
     }
   }
   dots.forEach((d, i) => {
@@ -4724,6 +4748,13 @@ function updateHud(capArea, capW) {
        実際にナビゲーションが起きる）。隠す時は確実に踏めないようにする */
     hudContact.tabIndex = hideContact ? -1 : 0;
   }
+  /* 同じことがドット列にも起きていた。狭い幅の部屋では
+     .hud.is-room .hud__dots { opacity:0; pointer-events:none } で伏せているが、
+     opacity と pointer-events はマウスのヒットテストしか塞がない。
+     Tabで見えないドットに止まり、Enterで warpTo → closeGallery され、
+     部屋の外へ無言で飛ばされていた */
+  const dotsHidden = !!(activeRoom || galleryOpen) && innerWidth <= 767;
+  for (const d of dots) d.tabIndex = dotsHidden ? -1 : 0;
   updateUrlHash(capArea, capW);
 }
 
