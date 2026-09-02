@@ -4231,8 +4231,55 @@ function openGallery(area) {
        に、実サイズが確定した状態でフェードインさせる */
     .to(room.meshes.filter((m) => m.userData.loaded).map((m) => m.material.uniforms.uOpacity),
       { value: 0.98, duration: 1.1, stagger: 0.06, ease: "power2.out" }, 0.5)
-    .to(anchorsWrap, { opacity: 0, duration: 0.5 }, 0)
-    .to(mine.map((a) => a.mat), { opacity: 0, duration: 0.7, ease: "power2.out" }, 0);
+    .to(anchorsWrap, { opacity: 0, duration: 0.5 }, 0);
+
+  /* 絵を「描かれる前」へ巻き戻す。
+
+       ここは長いあいだ opacity → 0 の単純なクロスフェードだった。BEAT には
+       5拍の設計が、featherMaterial には uLineFade / uDissolve のシェーダーが、
+       screenRectOf には投影の計算が書いてあるのに、どれも参照0回のまま
+       残っていた（grepで確認）。ここで実際に繋ぐ。
+
+       線 → 色面 の順で還すのは、「線を引いて、彩色した」という制作順の
+       逆再生。写真は絵の下から出てくるのではなく、絵が描かれる前の状態へ
+       戻った先に元からあった、という順番にしたい。
+
+       BEAT は比率なので総尺を掛けて実尺にする。rig.detour が 1.9 秒かけて
+       カメラを部屋へ寄せるので、絵の分解はその内側（1.7秒）で終える */
+  const BEAT_DUR = 1.7;
+  const seg = (k) => ({ at: BEAT[k][0] * BEAT_DUR, dur: (BEAT[k][1] - BEAT[k][0]) * BEAT_DUR });
+  /* 大きい方を「選ばれた絵」とみなし、他は先に引く＝選択の宣言 */
+  const ordered = mine.slice().sort((a, b) => (b.baseScale || 0) - (a.baseScale || 0));
+  const lead = ordered.slice(0, 1), others = ordered.slice(1);
+  const uOf = (a) => a.mat.userData && a.mat.userData.u;
+  const leadU = lead.map(uOf).filter(Boolean);
+  const allU = mine.map(uOf).filter(Boolean);
+
+  if (others.length) {
+    const o = seg("othersOut");
+    tl.to(others.map((a) => a.mat), { opacity: 0, duration: o.dur, ease: "power1.in" }, o.at);
+  }
+  {
+    /* わずかに前へ。紙から剥がれる予兆で、この後の分解に体重を乗せる */
+    const o = seg("lift");
+    tl.to(lead.map((a) => a.group.scale), { x: (i, t) => t.x * 1.035, y: (i, t) => t.y * 1.035,
+      duration: o.dur, ease: "power2.out" }, o.at);
+  }
+  {
+    /* ① 鉛筆の線（暗い成分）が先に消える */
+    const o = seg("line");
+    tl.to(leadU.map((u) => u.uLineFade), { value: 1, duration: o.dur, ease: "power1.inOut" }, o.at);
+  }
+  {
+    /* ② 残った色面が、明るい方から順に分解して光に還る */
+    const o = seg("dissolve");
+    tl.to(allU.map((u) => u.uDissolve), { value: 1, duration: o.dur, ease: "power1.inOut" }, o.at);
+    /* 点描は色面より後まで残す。写真はこの粒の隙間から立ち上がる */
+    const dust = mine.map((a) => a.dustMat && a.dustMat.uniforms.uPanelFade).filter(Boolean);
+    if (dust.length) tl.to(dust, { value: 0, duration: o.dur * 0.75, ease: "power1.in" }, o.at + o.dur * 0.45);
+    /* 保険。uDissolve はノイズ由来なので端に取り残しが出ることがある */
+    tl.to(mine.map((a) => a.mat), { opacity: 0, duration: BEAT_DUR * 0.14, ease: "none" }, BEAT.dissolve[1] * BEAT_DUR);
+  }
   /* reduced motionでは「移動を減らす」以上に「連続アニメーションそのもの」が
      負荷になる人がいるため、演出を消すのではなく大幅に速めて実質即時にする */
   tl.timeScale((hasPlayedTransition ? 1.5 : 1) * (REDUCE_MOTION ? 6 : 1));
