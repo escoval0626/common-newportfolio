@@ -1294,8 +1294,13 @@
          閉じ込めるため、外に居るこの live region の通知が読まれない可能性が
          あった。拡大専用に作った唯一の通知経路なので、中へ入れる -->
     <div id="zoomLive" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+    <!-- zoomLive と同じ理由でこの位置にある。aria-modal="true" は仮想
+         カーソルをダイアログ配下へ閉じ込めるため、閉じるボタンが#zoomCap
+         の外にあると、フォーカスされている当のボタンがダイアログの外、
+         という矛盾した状態になっていた。position:fixed なので親を
+         移しても画面上の位置・見た目は変わらない -->
+    <button class="zoom-close" id="zoomClose" type="button" aria-label="拡大表示を閉じる" tabindex="-1">×</button>
   </div>
-  <button class="zoom-close" id="zoomClose" type="button" aria-label="拡大表示を閉じる" tabindex="-1">×</button>
   <!-- 掛かった写真に触れた時のキャプション（下層ページ） -->
   <div class="room-cap" id="roomCap" aria-hidden="true"><i></i><span></span></div>
   <!-- ヒーロータイトル：ポートフォリオTOPのタイトル（冒頭で表示・スクロールで退場） -->

@@ -3969,7 +3969,13 @@ function stepZoom(dir) {
   if (zoomTl) zoomTl.kill();
   zoomTl = gsap.timeline({
     defaults: { ease: "expo.out" },
-    onComplete: () => unlockMesh(r, prev),
+    onComplete: () => {
+      unlockMesh(r, prev);
+      /* closeZoom と同じ理由。退く板(prev)がロックされている0.62秒の間に
+         他の板の relayout() が走ると、prevはtween焼き込み済みの古い位置
+         のまま固定される */
+      if (r.relayout) r.relayout();
+    },
   });
   /* 前の1枚は先に退き、入れ替わりで次が入ってくる */
   returnToWall(prev, zoomTl, 0, 0.62);
@@ -4008,7 +4014,16 @@ function closeZoom() {
   if (zoomTl) zoomTl.kill();
   zoomTl = gsap.timeline({
     defaults: { ease: "expo.inOut" },
-    onComplete: () => { mesh.renderOrder = 0; unlockMesh(r, mesh); },
+    onComplete: () => {
+      mesh.renderOrder = 0;
+      unlockMesh(r, mesh);
+      /* 復路の0.85秒間、この板はロック中で layout() の直接書き換えを
+         受けない（GSAPが握っているため）。その間に ensureFullTexture の
+         完了などで他の板の実寸が変わり relayout() が走ると、position は
+         焼き込み済みのtween終了値のまま古い並びに固定されてしまう。
+         ロックが外れた直後に呼び直し、最新の並びへ揃える */
+      if (r.relayout) r.relayout();
+    },
   });
   zoomTl
     .to(zoomCap, { opacity: 0, duration: 0.3, ease: "power2.in" }, 0)
@@ -4495,11 +4510,17 @@ function closeGallery(instant = false) {
 }
 
 window.addEventListener("keydown", (e) => {
-  /* Spaceキーは、旅を進める操作にも部屋内で写真を開く操作にも割り当てて
-     いるが、ボタンにフォーカスがある状態でSpaceを押した場合は話が別。
-     本来は「そのボタンを押す」というブラウザ標準の動作を期待しているのに、
-     このグローバルハンドラが割り込んで奪ってしまっていた */
-  if (e.key === " " && e.target && e.target.closest &&
+  /* Space・Enter は、旅を進める操作にも部屋内で写真を開く操作にも割り当てて
+     いるが、ボタンやリンクにフォーカスがある状態で押した場合は話が別。
+     本来は「それを押す」というブラウザ標準の動作を期待しているのに、
+     このグローバルハンドラが割り込んで奪ってしまっていた。
+     以前は Space にしかこのガードが無く、Enter には付いていなかった。
+     部屋の中では「BACK TO JOURNEY」「ロゴ」「ドット」「SNSリンク」
+     「ストリップの各サムネイル」がすべてボタン/リンクなので、キーボードで
+     部屋に入って最初に押すのがまさにこのEnterだった。BACKが効かず
+     正面の写真が開き、SNSリンクは遷移せず、ストリップは狙った1枚ではなく
+     常に正面の1枚を開いていた（実測で確認） */
+  if ((e.key === " " || e.key === "Enter") && e.target && e.target.closest &&
       e.target.closest('button, a, input, textarea, select, [role="button"]')) {
     return;
   }
@@ -4862,7 +4883,17 @@ function updateLoadProgress() {
 enterBtn.addEventListener("click", () => {
   loader.classList.add("is-hidden");
   loaderContent.classList.add("is-hidden");
+  /* .loader-content.is-hidden は visibility:hidden。フォーカス中の
+     enterBtn自身が不可視になり、ブラウザはフォーカスを<body>へ落として
+     いた。キーボード利用者は入場した瞬間に現在位置を失い、Tabをやり直す
+     ことになる。かつ areaLive は capW>0.45 の時しか書かないため、
+     progress=0 の入場直後は空文字のまま＝「押した／何が起きた／
+     今どこにいる」が一切届いていなかった。ロゴへ移し、一度だけ知らせる */
+  /* .hud 自体が visibility:hidden で始まるため、is-active を先に
+     付けないと子孫の hudLogo はフォーカス不可能（実測で確認） */
   hud.classList.add("is-active");
+  hudLogo.focus();
+  if (areaLive) areaLive.textContent = "旅を始めました。";
   /* 綿毛を専用シーンから本編sceneへ戻す。以後は通常どおりrenderer.render
      （メインのxpCanvas）だけが綿毛を描き、loaderFluffCanvas側は
      何も残っていないシーンをレンダリングし続けるだけになる
