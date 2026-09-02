@@ -1750,14 +1750,12 @@ function buildHero() {
    エリア定義（綿毛の旅の順路）
    PLANTS → LANDSCAPES → ARCHITECTURES → SNAPS → ABSTRACTS → EXHIBITIONS → CONTACT
 ============================================================ */
-/* 区間の間隔は 0.117±0.001（偏差0.85%）で、7つの渡りがすべて同じ長さだった。
-   カメラ距離も8つ中6つが 7.6〜8.0 に固まり、同じ画面が8回再生されているように
-   見えていた。長い谷と短い谷を作る。
-     0.105 / 0.140 / 0.103 / 0.134 / 0.084 / 0.150 / 0.104（比 1 : 1.79）
-   いちばん長いのは EXHIBITIONS の手前＝旅の第6幕へ向かう渡り。いちばん短いのは
-   ABSTRACTS の手前で、輪郭がほどける区間にだけ不意に着く。曲線上の着地点が
-   最大 0.020（≒2.7単位）ずれるが、現状でも viewPos との残差は 0.6〜6.6 あり
-   （着地は _pos.lerp(viewPos, 0.92) が支配する）、その範囲に収まっている */
+/* t は等間隔（0.117 刻み）。一度これを 0.084〜0.150 に崩して長い谷と短い谷を
+   作ったが、曲線上の着地点が動くぶん寄りの画角がずれ、実機で見ると絵が
+   フレームから外れた。数値上は viewPos との残差が従来の範囲（0.6〜6.6）に
+   収まっていても、見え方は別物だった。等間隔へ戻してある。
+   律動を崩すなら、t ではなく曲線の制御点と各エリアの center/viewPos を
+   まとめて動かす必要がある */
 const AREAS = [
   {
     /* ABOUT：冒頭のあと・PLANTSの前。自己紹介の固定カット（岩場の完成画＋バイオ） */
@@ -1778,7 +1776,7 @@ const AREAS = [
     },
   },
   {
-    name: "PLANTS", num: "01", t: 0.255,
+    name: "PLANTS", num: "01", t: 0.267,
     center: new THREE.Vector3(-6.5, 0.9, -30),
     viewPos: new THREE.Vector3(-1.6, 1.6, -24.2), /* ほんの少しアップ（前回の引きすぎを戻す） */
     hotspot: "View the series",
@@ -1818,7 +1816,7 @@ const AREAS = [
     },
   },
   {
-    name: "LANDSCAPES", num: "02", t: 0.395,
+    name: "LANDSCAPES", num: "02", t: 0.384,
     center: new THREE.Vector3(7.5, 1.4, -47),
     viewPos: new THREE.Vector3(2.6, 1.7, -42),
     gesture: { dy: -0.55, lookDy: -0.35 }, /* 水面すれすれを滑って近づく */
@@ -1859,7 +1857,7 @@ const AREAS = [
     },
   },
   {
-    name: "ARCHITECTURES", num: "03", t: 0.498,
+    name: "ARCHITECTURES", num: "03", t: 0.502,
     center: new THREE.Vector3(-7.5, 1.4, -64),
     viewPos: new THREE.Vector3(-2.6, 1.7, -59),
     /* dy はカメラを上げ、lookDy は注視点を上げる。両方 0.6 だと相殺され、
@@ -1868,7 +1866,7 @@ const AREAS = [
        カメラを少し下げ、注視点を絵の高さ（GROUND_Y+3.2 付近）まで上げて
        17.5° の見上げにする。「直線の中に、人の祈りを探す。」は
        仰ぎ見る姿勢でしか成立しない */
-    gesture: { dy: -0.2, lookDy: 2.5 },
+    gesture: { dy: 0.6, lookDy: 0.6 }, /* 見上げるように上昇して近づく */
     hotspot: "View the series",
     lines: ["直線の中に、", "人の祈りを探す。"],
     /* 北郷さんの実写。題は1枚ずつ実物を見て付けている */
@@ -1910,7 +1908,7 @@ const AREAS = [
     },
   },
   {
-    name: "SNAPS", num: "04", t: 0.632,
+    name: "SNAPS", num: "04", t: 0.619,
     center: new THREE.Vector3(5.5, 1.0, -80),
     viewPos: new THREE.Vector3(1.6, 1.6, -75),
     gesture: { dy: -0.15, lookDy: 0.25 }, /* 水平線へ向かって真っ直ぐ吸い込まれる */
@@ -1978,7 +1976,7 @@ const AREAS = [
   },
   {
     /* ABSTRACTS：具象を離れ、線とにじみだけが残る情景 */
-    name: "ABSTRACTS", num: "05", t: 0.716,
+    name: "ABSTRACTS", num: "05", t: 0.736,
     center: new THREE.Vector3(-7.0, 1.2, -96),
     viewPos: new THREE.Vector3(-2.2, 1.6, -91),
     gesture: { dy: 0.15, lookDy: -0.2 }, /* 輪郭が溶けるように、かすかに揺らぎながら漂う */
@@ -2012,7 +2010,7 @@ const AREAS = [
   },
   {
     /* EXHIBITIONS：展示・発表の情景 */
-    name: "EXHIBITIONS", num: "06", t: 0.866,
+    name: "EXHIBITIONS", num: "06", t: 0.853,
     center: new THREE.Vector3(7.5, 1.3, -112),
     viewPos: new THREE.Vector3(2.3, 1.6, -107),
     gesture: { dy: 0.3, lookDy: 0.15 }, /* 展示室に足を踏み入れ、静かに全体を見渡す */
@@ -2106,10 +2104,10 @@ const SERIES_TOTAL = String(
 const FRAMING_DEFAULT = 90;
 /* CONTACTは綿毛の接写で閉じるカットなので、既定の引き（90）を掛けず等倍で寄せる */
 /* 数値は「注視点までの距離の逆比」（framing = 100/pct）。小さいほど引く。
-   以前は 80/90/95/100 の実質2値で、8区間中6区間が距離 7.6〜8.0 に収まっていた。
-   LANDSCAPES は引いて風景に地平を与え、ABSTRACTS は寄って輪郭が
-   ほどけるところまで踏み込む。距離は 1.18 / 4.6 / 6.7 / 7.6 / 7.8 / 8.0 / 9.5 / 11.3 になる */
-const FRAMING_BY_AREA = { PLANTS: 80, LANDSCAPES: 62, SNAPS: 80, ABSTRACTS: 150, EXHIBITIONS: 95, CONTACT: 100 };
+   一度 LANDSCAPES 62（引く）/ ABSTRACTS 150（寄る）を足して距離の幅を
+   1.18〜11.3 に広げたが、実機では絵の入り方が破綻した。距離だけ動かすと
+   絵の実寸・高さ・near/far との関係が合わなくなる。元の値に戻してある */
+const FRAMING_BY_AREA = { PLANTS: 80, SNAPS: 80, EXHIBITIONS: 95, CONTACT: 100 };
 for (const a of AREAS) {
   if (!a.viewPos || !a.center) continue;
   const pct = FRAMING_BY_AREA[a.name] ?? FRAMING_DEFAULT;
@@ -2140,25 +2138,25 @@ const OPENING_COPY = {
    英訳を添える。t は各情景の中間地点。 */
 const VALLEY_LINES = [
   /* ABOUT → PLANTS */
-  { t: 0.2025,  jp: "まだ名前のない風景へ。",
+  { t: 0.209,  jp: "まだ名前のない風景へ。",
                 en: "Toward a landscape not yet named." },
   /* PLANTS → LANDSCAPES */
-  { t: 0.325, jp: "頬にあたる空気が、やわらかい。",
+  { t: 0.3255, jp: "頬にあたる空気が、やわらかい。",
                 en: "The air against my cheek is soft." },
   /* LANDSCAPES → ARCHITECTURES */
-  { t: 0.4465,  jp: "見えない時間が、目を澄ませる。",
+  { t: 0.443,  jp: "見えない時間が、目を澄ませる。",
                 en: "Unseen time clears the eye." },
   /* ARCHITECTURES → SNAPS */
-  { t: 0.565, jp: "気配だけ、まだそこにいる気がした。",
+  { t: 0.5605, jp: "気配だけ、まだそこにいる気がした。",
                 en: "Only the presence — I felt it was still there." },
   /* SNAPS → ABSTRACTS */
-  { t: 0.674, jp: "影も、いっしょに薄くなる。",
+  { t: 0.6775, jp: "影も、いっしょに薄くなる。",
                 en: "My shadow is fading with me." },
   /* ABSTRACTS → EXHIBITIONS */
-  { t: 0.791, jp: "記憶は、あとから追いついてくる。",
+  { t: 0.7945, jp: "記憶は、あとから追いついてくる。",
                 en: "Memory comes catching up later." },
   /* EXHIBITIONS → CONTACT */
-  { t: 0.918,  jp: "霧のむこうは、いつも明るい。",
+  { t: 0.912,  jp: "霧のむこうは、いつも明るい。",
                 en: "Beyond the fog, it is always bright." },
 ];
 
@@ -2180,6 +2178,8 @@ const ABOUT_BIO = {
     "His photography isn't about documentation, but about sensing the unspoken: atmosphere, texture, and silence.",
     "Through subtle grain and gentle shifts of light, he keeps seeking what lingers in the quiet.",
   ],
+  /* 画面には出していない（addAboutBox 参照）。EXHIBITIONS の作品ごとの
+     キャプションが同じ内容を持つため */
   exhibitions: [
     { jp: "BOKEHPHOTOFAN GROUP EXHIBITION 2024 出展", en: "Exhibited in BOKEHPHOTOFAN GROUP EXHIBITION 2024" },
     { jp: "epSITE ONLINE PHOTO CONTEST 2023 入賞", en: "Selected in epSITE ONLINE PHOTO CONTEST 2023" },
@@ -2893,25 +2893,10 @@ function addAboutBox(area) {
     p.textContent = line;
     bioEn.appendChild(p);
   });
-  /* 展示歴は英訳コピーの下に続けて置く（右列の中で完結させる） */
-  const ex = document.createElement("div");
-  ex.className = "xp-about__exhibitions";
-  const exH = document.createElement("h4");
-  exH.textContent = "Exhibitions & Awards";
-  ex.appendChild(exH);
-  const exList = document.createElement("ul");
-  ABOUT_BIO.exhibitions.forEach((item) => {
-    const li = document.createElement("li");
-    li.lang = "ja";   /* 親(bioEn)が英語なので、日本語側は戻す */
-    li.textContent = item.jp;
-    const em = document.createElement("em");
-    em.lang = "en";
-    em.textContent = item.en;
-    li.appendChild(em);
-    exList.appendChild(li);
-  });
-  ex.appendChild(exList);
-  bioEn.appendChild(ex);
+  /* 展示歴（Exhibitions & Awards）はここには出さない。
+     同じ内容が EXHIBITIONS の各作品を開いた時のキャプション（zoomCapText）に
+     出るので、ABOUTにも並べると二重になる。データは ABOUT_BIO.exhibitions に
+     残してあるので、戻すならこの位置に組み直せばよい */
 
   bioRow.appendChild(bioEn);
   el.appendChild(bioRow);
@@ -3089,6 +3074,17 @@ function measureAnchor(a) {
 }
 function updateAnchors() {
   for (const a of domAnchors) {
+    /* 追い越しの手前で送り出す。
+       以前はここで _v.z > 1（＝カメラの背後へ回った）を見て opacity を "0" に
+       叩き落としていた。冒頭コピーは pos.z = -1.6 とカメラの至近にあり、
+       progress 0.075 付近で追い越される。その時点の proximity はまだ 0.76 で、
+       つまり 76% 見えている状態から1フレームで消えていた（＝パッと消える）。
+       視野深度を先に出して、通過の手前 NEAR_OUT のあいだで滑らかに送り出す */
+    _wp.copy(a.pos).applyMatrix4(camera.matrixWorldInverse);
+    const d = -_wp.z;
+    const NEAR_OUT = 3.4;
+    if (d <= 0.02) { a.el.style.opacity = "0"; continue; }
+    const nearFade = THREE.MathUtils.clamp(d / NEAR_OUT, 0, 1);
     _v.copy(a.pos).project(camera);
     if (_v.z > 1) { a.el.style.opacity = "0"; continue; }
     let x = (_v.x * 0.5 + 0.5) * innerWidth;
@@ -3097,8 +3093,6 @@ function updateAnchors() {
        以前は「最大拡大率(1.08)で拡大されたら」を常に見込んでいたため、実際には
        画面に収まる箱まで"収まらない"と誤判定され、逃がし処理で中央へ落ちて
        ホットスポットに被っていた。いま実際に当てる倍率で測る */
-    _wp.copy(a.pos).applyMatrix4(camera.matrixWorldInverse);
-    const d = -_wp.z;
     /* 距離による拡縮の幅を狭め、遠い情景でも小さくなりすぎない／近くても大きすぎない。
        ABOUTのように長文で高さの余裕が少ない箱は、拡大するほど画面の天地から
        はみ出しやすくなるため、拡縮そのものを止めて常に基準サイズで見せる */
@@ -3195,10 +3189,23 @@ function updateAnchors() {
       proximity = Math.pow(THREE.MathUtils.clamp((w - 0.22) / 0.6, 0, 1), LINGER);
     }
     /* 同フレームの後続アンカー（ホットスポット）が裾を知るために控える */
-    a._y = y; a._scale = scale; a._op = proximity;
+    /* CONTACT だけ、真上のコピーと左端を揃える。
+       他の情景は縦組みなので揃える辺が無いが、ここは横組みの左揃えで、
+       導線が数十px内側に入っているとそれだけで組みが崩れて見える。
+       中黒（・）は行の外へぶら下げ、メールアドレスの頭を本文の左端に合わせる。
+       アンカーは translate(-50%,-50%) で中心を置くので、左端から中心を逆算する */
+    if (a.isHotspot && a.avoid && a.area && a.area.name === "CONTACT"
+        && a.avoid._x != null && a.avoid.baseW && a.baseW) {
+      const copyLeft = a.avoid._x - (a.avoid.baseW * a.avoid._scale) / 2;
+      const label = a.el.querySelector(".xp-hotspot__label");
+      const lead = label ? label.offsetLeft : 0;   /* 中黒＋gap の分 */
+      const half = (a.baseW * scale) / 2;
+      x = THREE.MathUtils.clamp(copyLeft + half - lead * scale, half + 8, innerWidth - half - 8);
+    }
+    a._x = x; a._y = y; a._scale = scale; a._op = proximity;
     a.el.style.transform = `translate(-50%, -50%) translate(${x}px, ${y}px) scale(${scale})`;
     a.el.style.filter = `blur(${blur.toFixed(2)}px)`;
-    a.el.style.opacity = (proximity * (rig.entered ? 1 : 0)).toFixed(2);
+    a.el.style.opacity = (proximity * nearFade * (rig.entered ? 1 : 0)).toFixed(2);
     a.el.style.pointerEvents = proximity > 0.5 ? "auto" : "none";
     /* 見えていないホットスポットがTabで踏めてしまうと、フォーカスの
        所在が画面上どこにも見えなくなる。視覚状態とフォーカス可能状態を揃える */

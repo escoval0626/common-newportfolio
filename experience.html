@@ -549,6 +549,7 @@
     .hud__social { display: flex; align-items: center; gap: 10px; }
     .hud__social-link {
       width: 26px; height: 26px; border-radius: 50%;
+      position: relative;
       border: 1px solid var(--ink-dim); color: var(--ink-mid);
       display: flex; align-items: center; justify-content: center;
       pointer-events: auto; text-decoration: none;
@@ -1076,7 +1077,21 @@
       .hud__dot.is-active::after {
         background: var(--ink); border-color: var(--ink); transform: scale(1.4);
       }
-      .hud__social-link { width: 44px; height: 44px; }
+      /* タップ領域は 44px（WCAG 2.5.5）のまま、見える円だけ小さくする。
+         44px の円をそのまま描くとデスクトップの26pxに対して大きすぎ、
+         紙の余白に対して重く見えていた。ドット列と同じ手法で、
+         枠線を疑似要素へ移して当たり判定と見た目を分ける */
+      .hud__social-link {
+        width: 44px; height: 44px; border-color: transparent;
+      }
+      .hud__social-link::before {
+        content: ""; position: absolute; left: 50%; top: 50%;
+        width: 30px; height: 30px; margin: -15px 0 0 -15px;
+        border: 1px solid var(--ink-dim); border-radius: 50%;
+        transition: border-color 0.3s;
+      }
+      .hud__social-link:hover, .hud__social-link:focus-visible { border-color: transparent; }
+      .hud__social-link:hover::before, .hud__social-link:focus-visible::before { border-color: var(--ink); }
 
       /* 縦書き1行が画面の高さを超えるため、横書きに切り替えて中央寄せ */
       /* 縦組み1行が画面の高さを超えるため、横組みに切り替えて中央寄せ。
