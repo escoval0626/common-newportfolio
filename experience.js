@@ -4186,8 +4186,13 @@ function updateRoom(dt) {
     if (on && hit.uv) u.uMouse.value.lerp(hit.uv, Math.min(1, dt * 12));
     u.uHover.value += ((on ? 1 : 0) - u.uHover.value) * Math.min(1, dt * 7);
     /* 触れている1枚以外は引く。全部が同じ強さで並んでいると視線が止まらない。
-       1枚を見ている間は、他は完全に退く */
-    const dimTarget = r.zoomed ? 1 : (anyHover && !on ? 1 : 0);
+       ただし、ホバー時まで 1.0 にすると彩度が8割落ち背景へ26%溶けるため、
+       写真が写真でなくなる。視距離が 6.1 の頃は隣が画面端で切れていて
+       ほとんど見えなかったので表に出なかったが、9.0 にして3〜4枚が同時に
+       見えるようになると、1枚に触れた瞬間に残り全部が灰色になる。
+       ホバーは 0.45（彩度-36% / 背景へ12%）まで緩め、退くが写真のまま
+       残るようにする。拡大中だけは従来どおり完全に退かせる */
+    const dimTarget = r.zoomed ? 1 : (anyHover && !on ? 0.45 : 0);
     u.uDim.value += (dimTarget - u.uDim.value) * Math.min(1, dt * 5);
 
     /* 画面内のどこにいるかで、中の像だけが逆に流れる（枠は動かない） */
