@@ -84,6 +84,19 @@
          4.62:1 になる値へ。見た目のトーンはほぼ変わらない */
       --ink-dim: #6f6b63;
       --line: #e0dedb;
+      /* キャンバスの上に重ねる文字のハロー。旅の途中でコピーが出る位置の
+         地の色を実測したところ、サンプルの94%が clear color ちょうどだった。
+         以前は #f2efe8 / #f4f1ea / #f7f6f2 の3色が混在し、いずれも地より
+         明るかったため（+4/+2/-2、+6/+4/0、+9/+9/+8）、文字の背後に
+         薄い明るいパッチが残っていた。ローダーの3箇所だけは DOM の紙
+         （--bg）の上なので、そちらは #f7f6f2 のまま */
+      --halo: #eeedea;
+      /* 墨の階調。以前は color: の生値が15種あり、うち11種は互いに
+         Δ8以下＝目視で差が出ない範囲だった。7段に畳んである */
+      --ink-deep: #171410;
+      --ink-warm: #2a2620;
+      --ink-cool: #3a362f;
+      --ink-soft: #4a453d;
       --font-latin: "Josefin Sans", sans-serif;
       --font-jp: "Zen Old Mincho", serif;
       --font-display: "Cormorant Garamond", serif;
@@ -147,7 +160,7 @@
       writing-mode: vertical-rl; text-orientation: mixed;
       font-family: var(--font-jp); font-weight: 400;
       font-size: clamp(16px, 1.45vw, 21px); letter-spacing: 0.22em; line-height: 1;
-      color: #4a453d;
+      color: var(--ink-soft);
     }
     /* 縦組みの隣なので、罫線は上ではなく右側に立てる */
     .valley-line__en {
@@ -156,7 +169,7 @@
       font-family: var(--font-latin); font-weight: 300;
       font-size: clamp(9.5px, 0.78vw, 11.5px); letter-spacing: 0.16em;
       line-height: 1.85; text-transform: uppercase;
-      color: #6a655c;
+      color: var(--ink-dim);
       border-right: 1px solid rgba(30,26,20,0.22);
       padding-right: clamp(12px, 1.2vw, 20px);
       order: -1;   /* 縦組みは右から読むので、英訳は左に置く */
@@ -193,7 +206,7 @@
     .zoom-close {
       position: fixed; z-index: 62; top: calc(clamp(20px, 4vh, 32px) + env(safe-area-inset-top, 0px)); right: calc(clamp(20px, 4vw, 56px) + env(safe-area-inset-right, 0px));
       width: 44px; height: 44px; border-radius: 50%;
-      border: 1px solid var(--ink-dim); background: rgba(247, 246, 242, 0.65);
+      border: 1px solid var(--ink-dim); background: rgba(238, 237, 234, 0.75);
       color: var(--ink-mid); display: flex; align-items: center; justify-content: center;
       font-family: var(--font-latin); font-size: 20px; line-height: 1; font-weight: 300;
       cursor: pointer; opacity: 0; pointer-events: none;
@@ -206,7 +219,7 @@
        これが無いと、暗い写真の上でタイトルが読めなくなる */
     .zoom-cap p, .zoom-cap h3 {
       overflow: hidden; margin: 0;
-      text-shadow: 0 0 8px #f7f6f2, 0 0 18px #f7f6f2, 0 0 4px #f7f6f2, 0 1px 2px rgba(247,246,242,0.95);
+      text-shadow: 0 0 8px var(--halo), 0 0 18px var(--halo), 0 0 4px var(--halo), 0 1px 2px rgba(238,237,234,0.95);
     }
     .zoom-cap span { display: inline-block; }
     .zoom-cap__num {
@@ -215,14 +228,14 @@
     }
     .zoom-cap__title {
       font-family: var(--font-display); font-weight: 300; font-style: italic;
-      font-size: clamp(28px, 3.4vw, 52px); line-height: 1.05; color: #171410;
+      font-size: clamp(28px, 3.4vw, 52px); line-height: 1.05; color: var(--ink-deep);
       padding-bottom: 0.06em;
     }
     .zoom-cap__meta {
       margin-top: 14px; padding-top: 12px;
       border-top: 1px solid rgba(30,26,20,0.22);
       font-family: var(--font-jp); font-size: 12px; letter-spacing: 0.2em;
-      color: #4e4941;
+      color: var(--ink-soft);
     }
     .zoom-cap__hint {
       margin-top: 20px;
@@ -246,8 +259,8 @@
     .room-cap span {
       display: inline-block;
       font-family: var(--font-jp); font-size: 12.5px; letter-spacing: 0.18em;
-      color: #2f2b25; white-space: nowrap;
-      text-shadow: 0 0 6px #f4f1ea, 0 0 12px #f4f1ea;
+      color: var(--ink-warm); white-space: nowrap;
+      text-shadow: 0 0 6px var(--halo), 0 0 12px var(--halo);
     }
 
     /* ===== ヒーロータイトル（ポートフォリオTOPのタイトルロックアップ） ===== */
@@ -260,8 +273,8 @@
       margin: 0; font-weight: 300;
       font-family: var(--font-display);
       font-size: clamp(52px, 8vw, 112px); line-height: 0.92;
-      letter-spacing: 0.06em; color: #171410;
-      text-shadow: 0 0 10px #f4f1ea, 0 2px 3px rgba(244,241,234,0.9);
+      letter-spacing: 0.06em; color: var(--ink-deep);
+      text-shadow: 0 0 10px var(--halo), 0 2px 3px rgba(238,237,234,0.9);
     }
     .hero-title__mark em {
       font-style: italic; font-weight: 300;
@@ -271,13 +284,13 @@
       display: flex; align-items: center; gap: 14px;
       font-family: var(--font-latin); font-weight: 300;
       font-size: 12px; letter-spacing: 0.42em; text-transform: uppercase;
-      color: #5f5a52;
+      color: var(--ink-mid);
       /* 退場のフェード中（progress 0.012〜）に、背後の縦組みコピーが
          この行と 199x12px 重なる。潰れるのが写真家名なので、
          にじみを一段厚くして紙から浮かせる。ただしフェード中は
          この行ごと半透明になり、にじみも同じだけ薄くなるため、
          これだけでは消しきれない（実装側でフェード窓も詰めてある） */
-      text-shadow: 0 0 6px #f4f1ea, 0 0 14px #f4f1ea, 0 0 3px #f4f1ea;
+      text-shadow: 0 0 6px var(--halo), 0 0 14px var(--halo), 0 0 3px var(--halo);
     }
     .hero-title__sub::before {
       content: ""; width: clamp(28px, 4vw, 52px); height: 1px;
@@ -620,19 +633,19 @@
     .xp-line {
       position: absolute; left: 0; top: 0;
       font-family: var(--font-jp); font-size: 24px; letter-spacing: 0.14em;
-      color: #16130f; white-space: nowrap;
+      color: var(--ink-deep); white-space: nowrap;
       opacity: 0;
       /* 絵の上でも読めるよう白ハローで縁取り */
-      text-shadow: 0 0 6px #f2efe8, 0 0 12px #f2efe8, 0 0 3px #f2efe8, 0 1px 2px rgba(242,239,232,0.9);
+      text-shadow: 0 0 6px var(--halo), 0 0 12px var(--halo), 0 0 3px var(--halo), 0 1px 2px rgba(238,237,234,0.9);
       will-change: transform, filter, opacity;
     }
     .xp-hotspot {
       position: absolute; left: 0; top: 0;
       display: inline-flex; align-items: baseline; gap: 7px;
-      /* <button> 化に伴うデフォルト見た目のリセット */
-      background: none; border: 0; padding: 0; margin: 0;
+      /* <button> / <a> のデフォルト見た目のリセット */
+      background: none; border: 0; padding: 0; margin: 0; text-decoration: none;
       font-family: var(--font-latin); font-size: 13px; letter-spacing: 0.16em;
-      color: #2a2620; white-space: nowrap;
+      color: var(--ink-warm); white-space: nowrap;
       cursor: pointer;
       /* 3D空間へ投影される前は原点(0,0)に居るため、透明なまま
          pointer-events:auto だと画面左上に見えないクリック領域が
@@ -640,7 +653,7 @@
          見えている間だけ反応させる */
       pointer-events: none;
       opacity: 0;
-      text-shadow: 0 0 6px #f2efe8, 0 0 10px #f2efe8;
+      text-shadow: 0 0 6px var(--halo), 0 0 10px var(--halo);
       will-change: transform, filter, opacity;
       transition: color 0.3s;
     }
@@ -697,16 +710,16 @@
       writing-mode: vertical-rl; text-orientation: mixed;
       font-family: var(--font-jp); font-weight: 500;
       font-size: clamp(25px, 1.95vw, 30.5px); letter-spacing: 0.16em; line-height: 1;
-      color: #16130f; white-space: nowrap;
-      text-shadow: 0 0 6px #f2efe8, 0 0 12px #f2efe8, 0 0 3px #f2efe8, 0 1px 2px rgba(242,239,232,0.9);
+      color: var(--ink-deep); white-space: nowrap;
+      text-shadow: 0 0 6px var(--halo), 0 0 12px var(--halo), 0 0 3px var(--halo), 0 1px 2px rgba(238,237,234,0.9);
     }
     .xp-copy__en {
       font-family: var(--font-latin); font-weight: 400;
       font-size: clamp(12.5px, 0.98vw, 15px); letter-spacing: 0.16em; text-transform: uppercase;
-      color: #322e28; white-space: nowrap;
+      color: var(--ink-warm); white-space: nowrap;
       padding-left: 0.2em; border-top: 1px solid rgba(30,26,20,0.28); padding-top: 10px;
       /* 絵の上でも読めるよう白ハローを強めに */
-      text-shadow: 0 0 5px #f4f1ea, 0 0 10px #f4f1ea, 0 0 2px #f4f1ea, 0 1px 1px rgba(244,241,234,0.95);
+      text-shadow: 0 0 5px var(--halo), 0 0 10px var(--halo), 0 0 2px var(--halo), 0 1px 1px rgba(238,237,234,0.95);
     }
 
     /* ===== CONTACT：詩コピーの下に、見出し・実メール・SNSへの導線を添える ===== */
@@ -717,13 +730,13 @@
     }
     .xp-contact-extra__headline {
       font-family: var(--font-display); font-weight: 300; font-style: italic;
-      font-size: clamp(26px, 3vw, 38px); color: #171410; line-height: 1;
-      text-shadow: 0 0 6px #f2efe8, 0 0 14px #f2efe8, 0 0 3px #f2efe8, 0 1px 2px rgba(242,239,232,0.9);
+      font-size: clamp(26px, 3vw, 38px); color: var(--ink-deep); line-height: 1;
+      text-shadow: 0 0 6px var(--halo), 0 0 14px var(--halo), 0 0 3px var(--halo), 0 1px 2px rgba(238,237,234,0.9);
     }
     .xp-contact-extra__lead {
       font-family: var(--font-jp); font-size: 14px; letter-spacing: 0.06em;
-      color: #2a2620; line-height: 1.8; margin-top: -6px;
-      text-shadow: 0 0 6px #f2efe8, 0 0 10px #f2efe8;
+      color: var(--ink-warm); line-height: 1.8; margin-top: -6px;
+      text-shadow: 0 0 6px var(--halo), 0 0 10px var(--halo);
     }
     /* モバイル幅で「相談」が割れて改行されるのを防ぐための明示的な改行。
        PCはコンテナが広く1行に収まるので、常時有効にすると逆に2行になって
@@ -733,7 +746,7 @@
       font-family: var(--font-latin); font-style: italic;
       font-size: 11px; letter-spacing: 0.03em; color: var(--ink-mid);
       margin-top: -8px;
-      text-shadow: 0 0 6px #f2efe8, 0 0 10px #f2efe8;
+      text-shadow: 0 0 6px var(--halo), 0 0 10px var(--halo);
     }
 
     /* ===== ABOUT：自己紹介カット（名前・肩書＋長文バイオ＋展示歴）
@@ -743,18 +756,18 @@
     .xp-about__more { display: none; }
     .xp-about__name {
       font-family: var(--font-jp); font-weight: 500;
-      font-size: 18px; letter-spacing: 0.1em; color: #16130f;
-      text-shadow: 0 0 6px #f2efe8, 0 0 12px #f2efe8, 0 1px 2px rgba(242,239,232,0.9);
+      font-size: 18px; letter-spacing: 0.1em; color: var(--ink-deep);
+      text-shadow: 0 0 6px var(--halo), 0 0 12px var(--halo), 0 1px 2px rgba(238,237,234,0.9);
     }
     .xp-about__name span {
       font-family: var(--font-latin); font-weight: 300;
-      font-size: 12px; letter-spacing: 0.22em; color: #4a463f; margin-left: 0.7em;
+      font-size: 12px; letter-spacing: 0.22em; color: var(--ink-soft); margin-left: 0.7em;
     }
     .xp-about__role {
       font-family: var(--font-latin); font-weight: 300;
       font-size: 10px; letter-spacing: 0.24em; text-transform: uppercase;
-      color: #6a655c;
-      text-shadow: 0 0 6px #f2efe8, 0 0 10px #f2efe8;
+      color: var(--ink-dim);
+      text-shadow: 0 0 6px var(--halo), 0 0 10px var(--halo);
       margin-top: 5px; margin-bottom: 22px;
     }
     /* 日本語列・英語列を左右に並べる（縦に積むと画面の高さを大きく超えるため） */
@@ -766,8 +779,8 @@
     .xp-about__bio p {
       font-family: var(--font-jp); font-weight: 500;
       font-size: clamp(12px, 0.94vw, 14.5px); line-height: 1.95; letter-spacing: 0.03em;
-      color: #16130f;
-      text-shadow: 0 0 6px #f2efe8, 0 0 12px #f2efe8, 0 0 3px #f2efe8, 0 1px 2px rgba(242,239,232,0.9);
+      color: var(--ink-deep);
+      text-shadow: 0 0 6px var(--halo), 0 0 12px var(--halo), 0 0 3px var(--halo), 0 1px 2px rgba(238,237,234,0.9);
     }
     .xp-about__bio-en {
       margin-left: 36px; padding-left: 36px;
@@ -779,8 +792,8 @@
       /* 1440 で 11.81px しかなく、岩場のドローイングの上で読みづらかった。
          下限を 12px、1440 で 13.7px まで上げる */
       font-size: clamp(12px, 0.95vw, 14px); line-height: 1.85; letter-spacing: 0.015em;
-      color: #3a362f;
-      text-shadow: 0 0 5px #f4f1ea, 0 0 10px #f4f1ea, 0 0 2px #f4f1ea, 0 1px 1px rgba(244,241,234,0.95);
+      color: var(--ink-cool);
+      text-shadow: 0 0 5px var(--halo), 0 0 10px var(--halo), 0 0 2px var(--halo), 0 1px 1px rgba(238,237,234,0.95);
     }
     .xp-about__exhibitions {
       margin-top: 12px; padding-top: 16px;
@@ -788,22 +801,22 @@
     }
     .xp-about__exhibitions h4 {
       font-family: var(--font-latin); font-weight: 400; font-size: clamp(9.5px, 0.74vw, 11.5px);
-      letter-spacing: 0.28em; text-transform: uppercase; color: #6a655c;
-      text-shadow: 0 0 6px #f2efe8, 0 0 10px #f2efe8;
+      letter-spacing: 0.28em; text-transform: uppercase; color: var(--ink-dim);
+      text-shadow: 0 0 6px var(--halo), 0 0 10px var(--halo);
       margin-bottom: 10px;
     }
     .xp-about__exhibitions ul { list-style: none; }
     .xp-about__exhibitions li {
       font-family: var(--font-jp); font-weight: 500; font-size: clamp(12px, 0.94vw, 14.5px); letter-spacing: 0.03em;
-      color: #16130f; line-height: 1.65; margin-bottom: 7px;
-      text-shadow: 0 0 6px #f2efe8, 0 0 12px #f2efe8, 0 0 3px #f2efe8, 0 1px 2px rgba(242,239,232,0.9);
+      color: var(--ink-deep); line-height: 1.65; margin-bottom: 7px;
+      text-shadow: 0 0 6px var(--halo), 0 0 12px var(--halo), 0 0 3px var(--halo), 0 1px 2px rgba(238,237,234,0.9);
     }
     .xp-about__exhibitions li:last-child { margin-bottom: 0; }
     .xp-about__exhibitions li em {
       display: block; font-style: normal;
       font-family: var(--font-latin); font-weight: 300; font-size: clamp(10.5px, 0.8vw, 12px); letter-spacing: 0.05em;
-      color: #6a655c; margin-top: 2px;
-      text-shadow: 0 0 5px #f4f1ea, 0 0 10px #f4f1ea;
+      color: var(--ink-dim); margin-top: 2px;
+      text-shadow: 0 0 5px var(--halo), 0 0 10px var(--halo);
     }
     /* ===== WebGL非対応・コンテキスト喪失時のフォールバック =====
        以前は「表示に問題が発生しました」というエラー文言＋問い合わせ
@@ -963,7 +976,7 @@
            （箱内 355px 以降・264px のうち 179px が折りたたみの外）が
            「無くなった」ように見える */
         flex-shrink: 0;
-        background: linear-gradient(to top, #f4f1ea 10%, rgba(244,241,234,0) 100%);
+        background: linear-gradient(to top, var(--halo) 10%, rgba(238,237,234,0) 100%);
       }
       .xp-about__bio-row { flex-direction: column; }
       .xp-about__bio-en {

@@ -2904,8 +2904,14 @@ AREAS.forEach((area) => {
     .addScaledVector(dir, -0.8)
     .addScaledVector(right, -2.0);
   hp.y = 0.35;
-  const el = document.createElement("button");
-  el.type = "button";
+  /* メールへ飛ぶ導線だけは <a href> で作る。button + location.href だと
+     右クリックでアドレスをコピーできず、新規タブでも開けず、読み上げも
+     「リンク」と言わない。メールクライアントが未設定の環境では、押しても
+     何も起きないまま文字列も取り出せなかった。写真家のサイトでいちばん
+     押される要素なので、ここは素のリンクにする */
+  const el = document.createElement(area.link ? "a" : "button");
+  if (area.link) el.href = area.link;
+  else el.type = "button";
   el.className = "xp-hotspot";
   /* 下線の呼吸アニメーションは scaleX(0.6→1) を「箱の幅いっぱい」に掛けているため、
      "View the series" のような短いラベルでは小さな揺れで済むが、CONTACT の
@@ -2940,7 +2946,7 @@ AREAS.forEach((area) => {
     e.stopPropagation();
     if (area.link) {
       trackEvent("click_commission_cta", { area: area.name });
-      window.location.href = area.link;
+      /* <a href> なので遷移は既定の動作に任せる（preventDefault しない） */
     } else {
       openGallery(area);
     }
@@ -3581,6 +3587,10 @@ if (IS_TOUCH && zoomCap) {
    キャプションは排他配置ではなく、サイト共通の4層ハローで
    絵の上に重ねる（.xp-copy__col と同じ手当て）ほうが正しい。 */
 const ZOOM_FIT_H = 0.86;
+/* 98点中54点（55%）が2:3の縦位置。縦位置では常に高さ側が上限に当たるため、
+   0.86 のままだと画面の天地に7%ずつ余白が残り、いちばん多い形の作品が
+   いちばん小さく出ていた。横位置は幅側が効くので 0.86 のままでよい */
+const ZOOM_FIT_H_PORTRAIT = 0.94;
 
 const _fwd = new THREE.Vector3();
 const _wp2 = new THREE.Vector3();
@@ -3653,7 +3663,8 @@ function bringToFront(mesh, tlLocal, at, dur) {
      暗い写真ではタイトルが読めなくなっていた。1920では13%まで減るので、
      いちばん台数の多いノートPC幅で最悪になる。
      写真は小さくなるが、作品を見る主画面で文字が像に乗るほうが損。 */
-  const k = Math.min((vh * ZOOM_FIT_H) / ROW_H, (vw * (IS_TOUCH ? 0.92 : 0.82)) / printW2);
+  const fitH = printW2 < ROW_H ? ZOOM_FIT_H_PORTRAIT : ZOOM_FIT_H;
+  const k = Math.min((vh * fitH) / ROW_H, (vw * (IS_TOUCH ? 0.92 : 0.82)) / printW2);
   const w2 = (printW2 + ROOM_PAD * 2) * k, h2 = (ROW_H + ROOM_PAD * 2) * k;
   _wp2.copy(camera.position).addScaledVector(_fwd, D).sub(r.group.position);
   /* 中央に置く。キャプションはハローで絵の上に重ねるので、
