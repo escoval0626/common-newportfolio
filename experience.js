@@ -3623,7 +3623,16 @@ function buildPlaceRoom(area) {
      生成コストが1フレームに乗って動きがカクつく）。ただし組んだだけで見せてはいけない。
      旅の途中で回廊の奥に写真の列が並んで見えてしまうので、開くまで伏せておく */
   room.visible = false;
-  const view = area.center.clone().addScaledVector(dir, 3.4);
+  /* 板は center + dir*9.5 の面に並ぶので、ここの係数が小さいほど引く。
+     3.4（視距離6.1）だと1枚が画面を占め、隣の1枚は画面端で切れていた。
+     「次がある」と分かる程度には見えるが、その1枚を作品として見ることは
+     できない。中途半端に切れた板が常に画面に残る。
+     0.5（視距離9.0）にすると、主役の大きさをほとんど落とさずに
+     2枚目・3枚目が画面内に収まる。12まで引くと3枚並ぶが主役が主役でなくなる
+     （ARCHITECTURES 23点で4通り実際に描画して比較した結果）。
+     2点だけの部屋（EXHIBITIONS）は引かない。引いても新たに見えるものが
+     無く、作品が小さくなるだけで、既に対を中央に据えて全部見せている */
+  const view = area.center.clone().addScaledVector(dir, (area.photos || []).length <= 2 ? 3.4 : 0.5);
   view.y = GROUND_Y + 2.35;
   const look = area.center.clone().addScaledVector(dir, 9.5);
   look.y = yBase;
