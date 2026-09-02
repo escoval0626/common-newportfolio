@@ -3275,8 +3275,13 @@ function makeRoomPhotoMat(tex) {
       uPlane: { value: new THREE.Vector2(1, 1) },
       uPrint: { value: new THREE.Vector4(0, 0, 1, 1) },
       uPhoto: { value: new THREE.Vector4(0, 0, 1, 1) },
-      uPaper: { value: new THREE.Color("#fdfdfb") },
-      uShadow: { value: new THREE.Color("#4a453d") },
+      /* THREE.Color はコンストラクタでリニア作業色空間へ変換される
+         （ColorManagement.enabled の既定 true）。このシェーダーは printCol を
+         sRGB値のまま混ぜているので、uniform 側もsRGBへ戻してから渡す必要がある。
+         渡さないと暗い色ほど大きくずれる（実測 #4a453d で4.35倍、#2a2620で7.0倍。
+         #fdfdfbのようなほぼ白は1.01倍でほとんど気づけない） */
+      uPaper: { value: new THREE.Color("#fdfdfb").convertLinearToSRGB() },
+      uShadow: { value: new THREE.Color("#4a453d").convertLinearToSRGB() },
       /* 極端な縦長・横長は表示上のプリント幅をクランプするので、
          そのぶん像側は中心から拡大してクロップする（対象そのものは歪めない） */
       uCrop: { value: new THREE.Vector2(1, 1) },
@@ -3313,7 +3318,15 @@ function makeRoomPhotoMat(tex) {
          扱う＝見た目を変えない。ここをリニアのまま混ぜると、影のグラデーションが
          知覚上より急に立ち上がって「影が濃く／不自然」に見えてしまう） */
       vec3 srgbToLinear(vec3 c) { return pow(c, vec3(2.2)); }
-      vec3 linearToSrgb(vec3 c) { return pow(max(c, vec3(0.0)), vec3(1.0 / 2.2)); }
+      /* pow(1/2.2) は sRGB の正確な逆関数ではない。区分式（IEC 61966-2-1）との
+         差は実測で最大+9レベル（入力6→出力15）、256段中57段（22%）が2レベル超
+         ずれる。厳密な逆関数に直すと「102→102」が全域で成立するようになる */
+      vec3 linearToSrgb(vec3 c) {
+        c = max(c, vec3(0.0));
+        vec3 lo = c * 12.92;
+        vec3 hi = pow(c, vec3(1.0 / 2.4)) * 1.055 - 0.055;
+        return mix(lo, hi, step(vec3(0.0031308), c));
+      }
 
       void main() {
         vec2 p = vUv * uPlane;
@@ -3554,13 +3567,33 @@ function buildPlaceRoom(area) {
       /* 画面に合わせる時は板ではなくプリントの寸法を使う（板は影の余白を含む） */
       m.userData.printW = printW;
       m.userData.printH = ROW_H;
-      m.scale.set(w, h, 1);
-      const u = m.material.uniforms;
-      u.uPlane.value.set(w, h);
-      /* 板の中でのプリントと像の位置（左下が原点） */
-      u.uPrint.value.set(PAD, PAD, PAD + printW, PAD + ROW_H);
-      u.uPhoto.value.set(PAD + EDGE, PAD + EDGE_BOTTOM, PAD + EDGE + pw, PAD + ROW_H - EDGE);
-      u.uCrop.value.copy(crop);
+      /* 「壁にあるべき姿」は常に控えておく。拡大表示中に ensureFullTexture が
+         フル解像度へ差し替わると、サムネイルとのアスペクト比の丸め誤差で
+         この w がわずかに動くことがある（実測 2.502 → 2.577）。以前は
+         bringToFront が openZoom 時点で scale を1回だけスナップショットして
+         d.homeScale に持ち、closeZoom はそれへ戻していたため、拡大中に
+         w が動くとスナップショットと食い違い、隣の板との間隔がズレて
+         重なって見えていた。ここを都度書き換えて常に最新に保つ */
+      m.userData.wallScale = { x: w, y: h };
+      m.userData.wallUniforms = {
+        plane: { x: w, y: h },
+        print: { x: PAD, y: PAD, z: PAD + printW, w: PAD + ROW_H },
+        photo: { x: PAD + EDGE, y: PAD + EDGE_BOTTOM, z: PAD + EDGE + pw, w: PAD + ROW_H - EDGE },
+        crop: { x: crop.x, y: crop.y },
+      };
+      /* 拡大中／退避中（stepZoomで送られる前の1枚）は GSAP のタイムラインが
+         scale・uniform を握っている。ここで直接書き換えると、拡大アニメー
+         ションの途中でサイズが壁基準へ引き戻され、見た目が跳ねる */
+      const isBusy = activeRoom && (activeRoom.zoomed === m || (activeRoom.locked && activeRoom.locked.has(m)));
+      if (!isBusy) {
+        m.scale.set(w, h, 1);
+        const u = m.material.uniforms;
+        u.uPlane.value.set(w, h);
+        /* 板の中でのプリントと像の位置（左下が原点） */
+        u.uPrint.value.set(PAD, PAD, PAD + printW, PAD + ROW_H);
+        u.uPhoto.value.set(PAD + EDGE, PAD + EDGE_BOTTOM, PAD + EDGE + pw, PAD + ROW_H - EDGE);
+        u.uCrop.value.copy(crop);
+      }
     }
     const total = meshes.reduce((s, m) => s + m.userData.w, 0) + GAP * (meshes.length - 1);
     let cur = -total / 2;
@@ -3574,7 +3607,11 @@ function buildPlaceRoom(area) {
          は、事前の先読み（updateCamera側）で大半は防げるものの、それでも
          間に合わなかった写真では位置が変わる。ここは滑らかな移動にして、
          万一のズレを「整列し直す」動きに見せる（ジャンプに見せない） */
-      if (m.userData.laidOut) {
+      m.userData.wallPos = targetPos.clone();
+      const isBusy = activeRoom && (activeRoom.zoomed === m || (activeRoom.locked && activeRoom.locked.has(m)));
+      if (isBusy) {
+        m.userData.laidOut = true;
+      } else if (m.userData.laidOut) {
         gsap.to(m.position, {
           x: targetPos.x, y: targetPos.y, z: targetPos.z,
           duration: 0.4, ease: "power2.out",
@@ -3756,15 +3793,13 @@ function bringToFront(mesh, tlLocal, at, dur) {
   /* 中央に置く。キャプションはハローで絵の上に重ねるので、
      下へ逃がすための持ち上げは要らない */
 
-  if (!d.homePos) {
-    d.homePos = mesh.position.clone();
+  /* 位置・寸法は layout() が userData.wallPos / wallScale / wallUniforms に
+     常に最新を控えている（拡大中でも）ので、ここでは向きだけ1回控える。
+     以前はここで position/scale/uniform もまとめてスナップショットしており
+     （d.homePos 等）、拡大中に写真の実寸が変わってもそれを追わないまま
+     closeZoom で古い値へ戻していた */
+  if (!d.homeQuat) {
     d.homeQuat = mesh.quaternion.clone();
-    d.homeScale = mesh.scale.clone();
-    const u0 = mesh.material.uniforms;
-    d.homeUniforms = {
-      plane: u0.uPlane.value.clone(), print: u0.uPrint.value.clone(),
-      photo: u0.uPhoto.value.clone(), crop: u0.uCrop.value.clone(),
-    };
   }
 
   const u = mesh.material.uniforms;
@@ -3800,37 +3835,35 @@ function bringToFront(mesh, tlLocal, at, dur) {
 /* 壁の元の場所へ返す */
 function returnToWall(mesh, tlLocal, at, dur) {
   const d = mesh.userData;
-  if (!d.homePos) return;
+  const wallPos = d.wallPos, wallScale = d.wallScale, wallUniforms = d.wallUniforms;
+  if (!wallPos || !wallScale) return;
   const u = mesh.material.uniforms;
   /* bringToFront と同じ理由でslerpに置き換える */
   const q0 = mesh.quaternion.clone();
-  const q1 = d.homeQuat.clone();
+  const q1 = (d.homeQuat || mesh.quaternion).clone();
   if (q0.dot(q1) < 0) q1.set(-q1.x, -q1.y, -q1.z, -q1.w);
   const qs = { t: 0 };
   tlLocal
-    .to(mesh.position, { x: d.homePos.x, y: d.homePos.y, z: d.homePos.z, duration: dur }, at)
-    .to(mesh.scale, { x: d.homeScale.x, y: d.homeScale.y, duration: dur }, at)
+    .to(mesh.position, { x: wallPos.x, y: wallPos.y, z: wallPos.z, duration: dur }, at)
+    .to(mesh.scale, { x: wallScale.x, y: wallScale.y, duration: dur }, at)
     .to(qs, {
       t: 1, duration: dur,
       onUpdate: () => mesh.quaternion.slerpQuaternions(q0, q1, qs.t),
     }, at);
-  if (d.homeUniforms) {
+  if (wallUniforms) {
     tlLocal
-      .to(u.uPlane.value, { x: d.homeUniforms.plane.x, y: d.homeUniforms.plane.y, duration: dur }, at)
+      .to(u.uPlane.value, { x: wallUniforms.plane.x, y: wallUniforms.plane.y, duration: dur }, at)
       .to(u.uPrint.value, {
-        x: d.homeUniforms.print.x, y: d.homeUniforms.print.y,
-        z: d.homeUniforms.print.z, w: d.homeUniforms.print.w, duration: dur,
+        x: wallUniforms.print.x, y: wallUniforms.print.y,
+        z: wallUniforms.print.z, w: wallUniforms.print.w, duration: dur,
       }, at)
       .to(u.uPhoto.value, {
-        x: d.homeUniforms.photo.x, y: d.homeUniforms.photo.y,
-        z: d.homeUniforms.photo.z, w: d.homeUniforms.photo.w, duration: dur,
+        x: wallUniforms.photo.x, y: wallUniforms.photo.y,
+        z: wallUniforms.photo.z, w: wallUniforms.photo.w, duration: dur,
       }, at)
-      .to(u.uCrop.value, { x: d.homeUniforms.crop.x, y: d.homeUniforms.crop.y, duration: dur }, at)
+      .to(u.uCrop.value, { x: wallUniforms.crop.x, y: wallUniforms.crop.y, duration: dur }, at)
       .to(u.uInset, { value: 0.9, duration: dur }, at);
   }
-  /* タイムライン登録時ではなく、実際に戻り切った時点で外す。
-     クリックガード（locked中は開けない）と二重の保険にする */
-  tlLocal.call(() => { d.homePos = null; }, null, at + dur);
 }
 
 function openZoom(mesh) {
