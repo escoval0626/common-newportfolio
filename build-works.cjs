@@ -39,6 +39,13 @@ const areas = [];
 }
 if (!areas.length) throw new Error("AREAS を読み取れなかった");
 
+/* alt に使う日本語の説明文。無い写真は作品名で代替する。
+   alt は「その写真が見えない人に何が写っているかを渡す文」で、題とは役割が違う。
+   詩的な題（Figures That Would Not Stay など）は説明として機能しないため別に書く */
+const ALT = (() => {
+  try { return JSON.parse(fs.readFileSync("works-alt.json", "utf8")); } catch (e) { return {}; }
+})();
+
 const thumb = (u) => u.replace(/\/([^/]+)$/, "/thumb/$1");
 const esc = (s) => String(s)
   .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -65,10 +72,12 @@ const esc = (s) => String(s)
       const t = thumb(p.url), d = dims[t];
       const wh = d ? ' width="' + d.w + '" height="' + d.h + '"' : "";
       const cap = p.award ? esc(p.title) + "<em>" + esc(p.award) + "</em>" : esc(p.title);
+      /* 説明文があればそれを alt にする。無ければ作品名で代替する */
+      const alt = ALT[p.url] || p.title + " — " + a.name;
       return [
         "        <figure>",
         '          <a href="' + SITE + "/" + p.url + '"><img src="' + t + '" alt="' +
-          esc(p.title) + " — " + a.name + '"' + wh + ' loading="lazy" decoding="async" /></a>',
+          esc(alt) + '"' + wh + ' loading="lazy" decoding="async" /></a>',
         "          <figcaption>" + cap + "</figcaption>",
         "        </figure>",
       ].join("\n");
@@ -101,6 +110,8 @@ const esc = (s) => String(s)
       thumbnailUrl: SITE + "/" + thumb(p.url),
       name: p.title,
       caption: p.award ? p.title + " — " + p.award : p.title,
+      /* alt と同じ説明文。構造化データ側でも画像の中身が伝わるようにする */
+      ...(ALT[p.url] ? { description: ALT[p.url] } : {}),
       genre: a.name,
       creator: { "@id": SITE + "/#person" },
       copyrightHolder: { "@id": SITE + "/#person" },
