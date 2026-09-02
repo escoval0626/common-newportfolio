@@ -1963,13 +1963,14 @@ const AREAS = [
        霧の電柱道(縦)を主役に、誰もいないブランコ(縦)を右奥に添える静かな構成。 */
     build() {
       const z = -80, y = GROUND_Y;
-      /* 主役を入れ替えた。霧の電柱道（= snaps-26 Poles into Fog）は、
-         遷移演出そのものが霧であるこのサイトでは「またこれか」になり、
-         かつ区間が宣言した「無人の場所と、そこを通り過ぎる人」を
-         代表していない。ブランコ（= snaps-02）は主題そのもので、霧でもない */
-      addArtwork("assets/scenes/s4_art.webp",            /* 無人のブランコ：主役 */
+      /* 一度ここで主役を「霧の電柱道」から「無人のブランコ」へ入れ替えた。
+         霧が遷移演出と重複するという理由だったが、実機で見ると寄りすぎに
+         なった。寸法も位置も同じでも、奥へ伸びる電柱道は奥行きとして、
+         手前に立つブランコは面積として読まれる。画角が変わって見える。
+         元に戻してある */
+      addArtwork("assets/scenes/s5_art.webp",            /* 霧の電柱道：主役 */
         5.2, y + 3.2, z, 6.0, this.viewPos, { aspect: 1.5, maxOp: 0.95, near: 6.5, far: 28 });
-      addArtwork("assets/scenes/s5_art.webp",            /* 霧の電柱道：右奥に添える */
+      addArtwork("assets/scenes/s4_art.webp",            /* 無人のブランコ：右奥に添える */
         9.0, y + 3.0, z - 2.6, 4.6, this.viewPos, { aspect: 1.5, maxOp: 0.6, near: 8, far: 30 });
       this.object = addPickProxy(5.5, -80, 7.4, 5.4, 4.2);
     },
