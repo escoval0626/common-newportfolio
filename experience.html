@@ -155,6 +155,10 @@
       will-change: opacity;
     }
     /* 縦組みでは <br> が新しい列を作ってしまうので、1列のまま見せる */
+    /* 4通りの帯。7本が同じ場所に出ると、詩が交換可能なムード文に見える */
+    .valley-line--left     { right: auto; left: clamp(10%, 15vw, 24%); top: 22%; }
+    .valley-line--low      { top: 44%; }
+    .valley-line--left-low { right: auto; left: clamp(10%, 15vw, 24%); top: 40%; }
     .valley-line__br { display: none; }
     .valley-line__jp {
       writing-mode: vertical-rl; text-orientation: mixed;
@@ -1081,9 +1085,13 @@
          読点で割ったはずの和文がそこでさらに折り返って3行になっていた
          （「あとから追いついてく／る。」）。和文の各行は折り返させない */
       .valley-line {
+        /* 狭い幅は動かす余地が無いので、位置の振り分けは打ち消して中央固定 */
         right: auto; left: 50%; transform: translateX(-50%); top: 12%;
         flex-direction: column; align-items: center; gap: 10px;
         max-width: 92vw;
+      }
+      .valley-line--left, .valley-line--low, .valley-line--left-low {
+        left: 50%; right: auto; top: 12%;
       }
       .valley-line__jp {
         writing-mode: horizontal-tb;

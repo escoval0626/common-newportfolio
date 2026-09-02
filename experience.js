@@ -1750,6 +1750,14 @@ function buildHero() {
    エリア定義（綿毛の旅の順路）
    PLANTS → LANDSCAPES → ARCHITECTURES → SNAPS → ABSTRACTS → EXHIBITIONS → CONTACT
 ============================================================ */
+/* 区間の間隔は 0.117±0.001（偏差0.85%）で、7つの渡りがすべて同じ長さだった。
+   カメラ距離も8つ中6つが 7.6〜8.0 に固まり、同じ画面が8回再生されているように
+   見えていた。長い谷と短い谷を作る。
+     0.105 / 0.140 / 0.103 / 0.134 / 0.084 / 0.150 / 0.104（比 1 : 1.79）
+   いちばん長いのは EXHIBITIONS の手前＝旅の第6幕へ向かう渡り。いちばん短いのは
+   ABSTRACTS の手前で、輪郭がほどける区間にだけ不意に着く。曲線上の着地点が
+   最大 0.020（≒2.7単位）ずれるが、現状でも viewPos との残差は 0.6〜6.6 あり
+   （着地は _pos.lerp(viewPos, 0.92) が支配する）、その範囲に収まっている */
 const AREAS = [
   {
     /* ABOUT：冒頭のあと・PLANTSの前。自己紹介の固定カット（岩場の完成画＋バイオ） */
@@ -1770,7 +1778,7 @@ const AREAS = [
     },
   },
   {
-    name: "PLANTS", num: "01", t: 0.267,
+    name: "PLANTS", num: "01", t: 0.255,
     center: new THREE.Vector3(-6.5, 0.9, -30),
     viewPos: new THREE.Vector3(-1.6, 1.6, -24.2), /* ほんの少しアップ（前回の引きすぎを戻す） */
     hotspot: "View the series",
@@ -1810,7 +1818,7 @@ const AREAS = [
     },
   },
   {
-    name: "LANDSCAPES", num: "02", t: 0.384,
+    name: "LANDSCAPES", num: "02", t: 0.395,
     center: new THREE.Vector3(7.5, 1.4, -47),
     viewPos: new THREE.Vector3(2.6, 1.7, -42),
     gesture: { dy: -0.55, lookDy: -0.35 }, /* 水面すれすれを滑って近づく */
@@ -1851,10 +1859,16 @@ const AREAS = [
     },
   },
   {
-    name: "ARCHITECTURES", num: "03", t: 0.502,
+    name: "ARCHITECTURES", num: "03", t: 0.498,
     center: new THREE.Vector3(-7.5, 1.4, -64),
     viewPos: new THREE.Vector3(-2.6, 1.7, -59),
-    gesture: { dy: 0.6, lookDy: 0.6 }, /* 見上げるように上昇して近づく */
+    /* dy はカメラを上げ、lookDy は注視点を上げる。両方 0.6 だと相殺され、
+       viewPos.y 1.7 → center.y+0.6 = 2.0 で、実際にはわずかに見下ろしていた。
+       この区間で最大の身振りが 4.4° しかなく、8区間の中で埋もれていた。
+       カメラを少し下げ、注視点を絵の高さ（GROUND_Y+3.2 付近）まで上げて
+       17.5° の見上げにする。「直線の中に、人の祈りを探す。」は
+       仰ぎ見る姿勢でしか成立しない */
+    gesture: { dy: -0.2, lookDy: 2.5 },
     hotspot: "View the series",
     lines: ["直線の中に、", "人の祈りを探す。"],
     /* 北郷さんの実写。題は1枚ずつ実物を見て付けている */
@@ -1896,7 +1910,7 @@ const AREAS = [
     },
   },
   {
-    name: "SNAPS", num: "04", t: 0.619,
+    name: "SNAPS", num: "04", t: 0.632,
     center: new THREE.Vector3(5.5, 1.0, -80),
     viewPos: new THREE.Vector3(1.6, 1.6, -75),
     gesture: { dy: -0.15, lookDy: 0.25 }, /* 水平線へ向かって真っ直ぐ吸い込まれる */
@@ -1964,7 +1978,7 @@ const AREAS = [
   },
   {
     /* ABSTRACTS：具象を離れ、線とにじみだけが残る情景 */
-    name: "ABSTRACTS", num: "05", t: 0.736,
+    name: "ABSTRACTS", num: "05", t: 0.716,
     center: new THREE.Vector3(-7.0, 1.2, -96),
     viewPos: new THREE.Vector3(-2.2, 1.6, -91),
     gesture: { dy: 0.15, lookDy: -0.2 }, /* 輪郭が溶けるように、かすかに揺らぎながら漂う */
@@ -1998,7 +2012,7 @@ const AREAS = [
   },
   {
     /* EXHIBITIONS：展示・発表の情景 */
-    name: "EXHIBITIONS", num: "06", t: 0.853,
+    name: "EXHIBITIONS", num: "06", t: 0.866,
     center: new THREE.Vector3(7.5, 1.3, -112),
     viewPos: new THREE.Vector3(2.3, 1.6, -107),
     gesture: { dy: 0.3, lookDy: 0.15 }, /* 展示室に足を踏み入れ、静かに全体を見渡す */
@@ -2091,7 +2105,11 @@ const SERIES_TOTAL = String(
    注視点から視点までの距離を伸ばして画角を引く。エリア別に上書き可能。 */
 const FRAMING_DEFAULT = 90;
 /* CONTACTは綿毛の接写で閉じるカットなので、既定の引き（90）を掛けず等倍で寄せる */
-const FRAMING_BY_AREA = { PLANTS: 80, SNAPS: 80, EXHIBITIONS: 95, CONTACT: 100 };
+/* 数値は「注視点までの距離の逆比」（framing = 100/pct）。小さいほど引く。
+   以前は 80/90/95/100 の実質2値で、8区間中6区間が距離 7.6〜8.0 に収まっていた。
+   LANDSCAPES は引いて風景に地平を与え、ABSTRACTS は寄って輪郭が
+   ほどけるところまで踏み込む。距離は 1.18 / 4.6 / 6.7 / 7.6 / 7.8 / 8.0 / 9.5 / 11.3 になる */
+const FRAMING_BY_AREA = { PLANTS: 80, LANDSCAPES: 62, SNAPS: 80, ABSTRACTS: 150, EXHIBITIONS: 95, CONTACT: 100 };
 for (const a of AREAS) {
   if (!a.viewPos || !a.center) continue;
   const pct = FRAMING_BY_AREA[a.name] ?? FRAMING_DEFAULT;
@@ -2122,25 +2140,25 @@ const OPENING_COPY = {
    英訳を添える。t は各情景の中間地点。 */
 const VALLEY_LINES = [
   /* ABOUT → PLANTS */
-  { t: 0.209,  jp: "まだ名前のない風景へ。",
+  { t: 0.2025,  jp: "まだ名前のない風景へ。",
                 en: "Toward a landscape not yet named." },
   /* PLANTS → LANDSCAPES */
-  { t: 0.3255, jp: "頬にあたる空気が、やわらかい。",
+  { t: 0.325, jp: "頬にあたる空気が、やわらかい。",
                 en: "The air against my cheek is soft." },
   /* LANDSCAPES → ARCHITECTURES */
-  { t: 0.443,  jp: "見えない時間が、目を澄ませる。",
+  { t: 0.4465,  jp: "見えない時間が、目を澄ませる。",
                 en: "Unseen time clears the eye." },
   /* ARCHITECTURES → SNAPS */
-  { t: 0.5605, jp: "気配だけ、まだそこにいる気がした。",
+  { t: 0.565, jp: "気配だけ、まだそこにいる気がした。",
                 en: "Only the presence — I felt it was still there." },
   /* SNAPS → ABSTRACTS */
-  { t: 0.6775, jp: "影も、いっしょに薄くなる。",
+  { t: 0.674, jp: "影も、いっしょに薄くなる。",
                 en: "My shadow is fading with me." },
   /* ABSTRACTS → EXHIBITIONS */
-  { t: 0.7945, jp: "記憶は、あとから追いついてくる。",
+  { t: 0.791, jp: "記憶は、あとから追いついてくる。",
                 en: "Memory comes catching up later." },
   /* EXHIBITIONS → CONTACT */
-  { t: 0.912,  jp: "霧のむこうは、いつも明るい。",
+  { t: 0.918,  jp: "霧のむこうは、いつも明るい。",
                 en: "Beyond the fog, it is always bright." },
 ];
 
@@ -2910,7 +2928,18 @@ function addAboutBox(area) {
     .addScaledVector(dir, -0.8)
     .addScaledVector(right, -1.1);
   p.y = 1.7;
-  domAnchors.push({ el, pos: p, area, beatT: null, clamp: true, noScale: true });
+  /* コピーの投影xは7区間で 486〜537（画面幅の3.5%）に集まり、そのうえ
+     clampRect が全区間共通だったため y は 334px へ吸い付いていた。3Dに置いた
+     はずのコピーが、実際には毎回同じ場所に出ていた。情景ごとに帯を変える。
+     狭い幅は動かす余地が無いので既定のまま */
+  const COPY_BAND = {
+    LANDSCAPES:    { x0: 0.44, x1: 0.88, y0: 0.12, y1: 0.58 },
+    ARCHITECTURES: { x0: 0.12, x1: 0.54, y0: 0.30, y1: 0.74 },
+    SNAPS:         { x0: 0.42, x1: 0.86, y0: 0.26, y1: 0.74 },
+    ABSTRACTS:     { x0: 0.16, x1: 0.60, y0: 0.10, y1: 0.56 },
+  };
+  domAnchors.push({ el, pos: p, area, beatT: null, clamp: true, noScale: true,
+    clampRect: MOBILE_LAYOUT ? undefined : COPY_BAND[area.name] });
 }
 
 AREAS.forEach((area) => {
@@ -3008,9 +3037,13 @@ if (document.fonts && document.fonts.ready) {
 }
 
 /* 谷の詩は3D投影しない（絵に紐づかず、霧そのものの中に漂う言葉なので画面固定） */
-VALLEY_LINES.forEach((v) => {
+VALLEY_LINES.forEach((v, i) => {
   const el = document.createElement("p");
-  el.className = "valley-line";
+  /* 7本とも right:15vw / top:15% の同じ場所に、同じ長さで出ていた。
+     入れ替えても誰も気づかない＝交換可能なムード文に見える原因。
+     4通りの帯へ振る（狭い幅では中央固定のまま） */
+  el.className = "valley-line " + ["", "valley-line--left", "valley-line--low",
+    "valley-line--left-low", "", "valley-line--left", "valley-line--low"][i];
   const jp = document.createElement("span");
   jp.className = "valley-line__jp";
   /* 狭い幅では和文が2行に折り返るが、日本語は分かち書きしないので
