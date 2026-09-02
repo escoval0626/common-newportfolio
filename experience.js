@@ -1830,7 +1830,12 @@ const AREAS = [
       ["assets/photos/landscapes/landscapes-10.jpg", "Cedar Slope, Yellow Bloom"],
       ["assets/photos/landscapes/landscapes-11.jpg", "Maple, Dark Trunk"],
       ["assets/photos/landscapes/landscapes-12.jpg", "Pasture, Distant Towers"],
+      /* 同じ牧草地の生き物。2区間に散っていたので隣に置く */
+      ["assets/photos/snaps/snaps-32.jpg", "Calf in the Fog"],
       ["assets/photos/landscapes/landscapes-13.jpg", "Boat on the Lake"],
+      /* ABSTRACTS から移した。輪郭がほどける区間に、輪郭の完全な
+         長秒露光の渓流が1枚だけ混じっていた。水の風景としてここが正しい */
+      ["assets/photos/abstracts/abstracts-03.jpg", "Rapids Over Stones"],
       ["assets/photos/landscapes/landscapes-14.jpg", "Island of Trees, Mirror"],
       ["assets/photos/landscapes/landscapes-15.jpg", "Grass in Low Cloud"],
       ["assets/photos/landscapes/landscapes-16.jpg", "Two Figures, Reflection"],
@@ -1854,6 +1859,10 @@ const AREAS = [
     lines: ["直線の中に、", "人の祈りを探す。"],
     /* 北郷さんの実写。題は1枚ずつ実物を見て付けている */
     photos: [
+      /* 「直線の中に、人の祈りを探す。」を実体で受ける1枚。もとはSNAPSに
+         置いていたが、祈りの場そのものが写っているのはこの区間で唯一これ
+         だけで、宣言だけがここに、証拠が隣室にある状態だった。先頭に置く */
+      ["assets/photos/snaps/snaps-11.jpg", "Empty Pews"],
       ["assets/photos/architectures/architectures-01.jpg", "Café Window, Green Beyond"],
       ["assets/photos/architectures/architectures-02.jpg", "Hilltop, Yellow Field"],
       ["assets/photos/architectures/architectures-03.jpg", "Dark Eaves, Brick Beyond"],
@@ -1894,7 +1903,8 @@ const AREAS = [
     hotspot: "View the series",
     lines: ["通りすがりに見たものが、", "いちばん長く残る。"],
     /* 北郷さんの実写。題は1枚ずつ実物を見て付けている。
-       2026-09、32点から16点へ絞った。残したのは「無人の場所と、そこを
+       2026-09、32点から16点へ絞り、うち4点を主題の合う区間へ配り直して
+       12点になった。残したのは「無人の場所と、そこを
        通り過ぎる人」の一群 — 誰もいないブランコ、誰もいない会衆席、
        ランプの下に残されたグラス、スクリーンに落ちた人影、長時間露光で
        溶けた通行人。32点のままだと街・記録・人物が混ざり、この主題が
@@ -1904,21 +1914,22 @@ const AREAS = [
       ["assets/photos/snaps/snaps-03.jpg", "Wind Chime, Glass"],
       ["assets/photos/snaps/snaps-04.jpg", "Wires in Fog"],
       ["assets/photos/snaps/snaps-05.jpg", "Pier at Dusk"],
-      ["assets/photos/snaps/snaps-11.jpg", "Empty Pews"],
       ["assets/photos/snaps/snaps-14.jpg", "Gull on Still Water"],
       ["assets/photos/snaps/snaps-19.jpg", "Glass Under Lamplight"],
-      ["assets/photos/snaps/snaps-21.jpg", "Stems, Studded with Light"],
-      ["assets/photos/snaps/snaps-22.jpg", "Leaves on Glass"],
       ["assets/photos/snaps/snaps-24.jpg", "Shadow on the Screen"],
       ["assets/photos/snaps/snaps-25.jpg", "Afternoon, Three Generations"],
       ["assets/photos/snaps/snaps-26.jpg", "Poles into Fog"],
       ["assets/photos/snaps/snaps-28.jpg", "Figures That Would Not Stay"],
       ["assets/photos/snaps/snaps-29.jpg", "Crossing, Old Street"],
       ["assets/photos/snaps/snaps-30.jpg", "Waiting by the Window"],
-      ["assets/photos/snaps/snaps-32.jpg", "Calf in the Fog"],
     ],
     /* 外した16点。ファイルは assets/photos/snaps/ に残してあるので、
        上の配列に行を戻すだけで復帰できる。
+       別に、以下の4点は捨てずに他の区間へ移した：
+       11 Empty Pews → ARCHITECTURES（先頭）
+       21 Stems, Studded with Light → ABSTRACTS
+       22 Leaves on Glass → ABSTRACTS
+       32 Calf in the Fog → LANDSCAPES（landscapes-12 の牛の隣）
        01 Gull Over Surf
        06 Hand on a Shoulder
        07 Horse, Overcast Field
@@ -1940,9 +1951,13 @@ const AREAS = [
        霧の電柱道(縦)を主役に、誰もいないブランコ(縦)を右奥に添える静かな構成。 */
     build() {
       const z = -80, y = GROUND_Y;
-      addArtwork("assets/scenes/s5_art.webp",            /* 霧の電柱道：主役 */
+      /* 主役を入れ替えた。霧の電柱道（= snaps-26 Poles into Fog）は、
+         遷移演出そのものが霧であるこのサイトでは「またこれか」になり、
+         かつ区間が宣言した「無人の場所と、そこを通り過ぎる人」を
+         代表していない。ブランコ（= snaps-02）は主題そのもので、霧でもない */
+      addArtwork("assets/scenes/s4_art.webp",            /* 無人のブランコ：主役 */
         5.2, y + 3.2, z, 6.0, this.viewPos, { aspect: 1.5, maxOp: 0.95, near: 6.5, far: 28 });
-      addArtwork("assets/scenes/s4_art.webp",            /* 無人のブランコ：右奥に添える */
+      addArtwork("assets/scenes/s5_art.webp",            /* 霧の電柱道：右奥に添える */
         9.0, y + 3.0, z - 2.6, 4.6, this.viewPos, { aspect: 1.5, maxOp: 0.6, near: 8, far: 30 });
       this.object = addPickProxy(5.5, -80, 7.4, 5.4, 4.2);
     },
@@ -1959,10 +1974,14 @@ const AREAS = [
     photos: [
       ["assets/photos/abstracts/abstracts-01.jpg", "Undergrowth Coming Undone"],
       ["assets/photos/abstracts/abstracts-02.jpg", "Green, Running Sideways"],
-      ["assets/photos/abstracts/abstracts-03.jpg", "Rapids Over Stones"],
       ["assets/photos/abstracts/abstracts-04.jpg", "Young Fir in Fog"],
+      /* SNAPS から移した2点。この区間は8点のうち5点が「植生を縦に流した」
+         同じ手つきで、枚数ではなく手数が足りていなかった。露のマクロと
+         濡れたガラス越しは、輪郭がほどける主題に合いながら手つきが違う */
+      ["assets/photos/snaps/snaps-21.jpg", "Stems, Studded with Light"],
       ["assets/photos/abstracts/abstracts-05.jpg", "Bud, Glowing Green"],
       ["assets/photos/abstracts/abstracts-06.jpg", "Pansies, Layered"],
+      ["assets/photos/snaps/snaps-22.jpg", "Leaves on Glass"],
       ["assets/photos/abstracts/abstracts-07.jpg", "Amber Curtain"],
       ["assets/photos/abstracts/abstracts-08.jpg", "A Grove, Half Erased"],
     ],
