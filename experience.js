@@ -3631,8 +3631,12 @@ function buildPlaceRoom(area) {
      2枚目・3枚目が画面内に収まる。12まで引くと3枚並ぶが主役が主役でなくなる
      （ARCHITECTURES 23点で4通り実際に描画して比較した結果）。
      2点だけの部屋（EXHIBITIONS）は引かない。引いても新たに見えるものが
-     無く、作品が小さくなるだけで、既に対を中央に据えて全部見せている */
-  const view = area.center.clone().addScaledVector(dir, (area.photos || []).length <= 2 ? 3.4 : 0.5);
+     無く、作品が小さくなるだけで、既に対を中央に据えて全部見せている。
+     狭い幅も引かない。375x667 実測で、プリントの占有率が 52% → 35% まで
+     落ちるのに対し、縦長の画面では引いても隣は画面内に入ってこない。
+     引く理由（隣が端で切れている）がそもそも成立せず、作品が小さくなるだけ */
+  const noPull = (area.photos || []).length <= 2 || MOBILE_LAYOUT;
+  const view = area.center.clone().addScaledVector(dir, noPull ? 3.4 : 0.5);
   view.y = GROUND_Y + 2.35;
   const look = area.center.clone().addScaledVector(dir, 9.5);
   look.y = yBase;
@@ -4078,12 +4082,20 @@ function clearRoomStrip() {
 
 /* 現在地の更新。列の位置（roomScroll.current）に最も近い1枚を選ぶ。
    選ばれた項目が枠の外にあれば、ストリップ自身も横に送って見せる */
-function updateRoomStrip(r) {
+function updateRoomStrip(r, hit) {
   if (!stripItems.length || !r || !r.positions) return;
+  /* キャプションは触れている板を出す。ストリップだけ列の中央を指していると、
+     名前と光っているサムネイルが食い違う。1枚しか見えなかった頃は
+     触れられるのが中央の板だけだったので一致していたが、視距離を引いて
+     3〜4枚が同時に見えるようになると別々を指せる。触れている間はそちらへ */
   let idx = 0, best = Infinity;
-  for (let i = 0; i < r.positions.length; i++) {
-    const d = Math.abs((r.positions[i] || 0) - roomScroll.current);
-    if (d < best) { best = d; idx = i; }
+  if (hit && hit.object && hit.object.userData && hit.object.userData.idx != null) {
+    idx = hit.object.userData.idx;
+  } else {
+    for (let i = 0; i < r.positions.length; i++) {
+      const d = Math.abs((r.positions[i] || 0) - roomScroll.current);
+      if (d < best) { best = d; idx = i; }
+    }
   }
   if (idx === stripIdx) return;
   stripIdx = idx;
@@ -4141,7 +4153,6 @@ const _rv = new THREE.Vector3();
 function updateRoom(dt) {
   if (!activeRoom) return;
   const r = activeRoom;
-  updateRoomStrip(r);   /* 一覧の現在地。列が動いた分だけ追従させる */
   /* 1枚を見ている間は列を動かさない（横に流れると見ている物が逃げる） */
   if (!r.zoomed) {
     /* ±span（板の総幅の半分）だと最後の1枚を正面に置いた先にも
@@ -4171,6 +4182,8 @@ function updateRoom(dt) {
   raycaster.setFromCamera(rig.mouse, camera);
   const hit = r.zoomed ? null : raycaster.intersectObjects(r.meshes, false)[0];
   const anyHover = !!hit;
+  /* 一覧の現在地。触れている板があればそれ、無ければ列の中央 */
+  updateRoomStrip(r, hit);
   for (const m of r.meshes) {
     if (m === r.zoomed || (r.locked && r.locked.has(m))) {
       /* 選ばれた1枚と、戻っている最中の1枚は GSAP が姿勢を握っているので触らない */
