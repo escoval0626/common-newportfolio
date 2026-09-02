@@ -37,6 +37,6 @@
       ]
     }
   ],
-  "buildCommand": "node build-stamp.cjs",
+  "buildCommand": "node build-stamp.cjs && node build-works.cjs",
   "outputDirectory": "."
 }
