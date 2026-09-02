@@ -1967,8 +1967,15 @@ const AREAS = [
          元に戻してある */
       addArtwork("assets/scenes/s5_art.webp",            /* 霧の電柱道：主役 */
         5.2, y + 3.2, z, 6.0, this.viewPos, { aspect: 1.5, maxOp: 0.95, near: 6.5, far: 28 });
+      /* 添えだが小さすぎた。1440x900 実測で画面幅の28%（407px）しかなく、
+         主役の霧の電柱道の中に埋もれていた。上に115px・下に169px 余白が
+         あるので 1.37倍までは収まる。主役（6.0）を超えない 5.6 まで広げる。
+         1280x720 では上が11pxはみ出すが、addArtwork は featherMaterial(mat, 0.02)
+         ＝上端12%を smoothstep(1.0, 0.88) で透明へ落としており、11px は画像高
+         682px の1.6%＝羽化域の奥（アルファ約0.05）。見えるものは切れていない。
+         濃度は 0.6 のまま＝あくまで添え */
       addArtwork("assets/scenes/s4_art.webp",            /* 無人のブランコ：右奥に添える */
-        9.0, y + 3.0, z - 2.6, 4.6, this.viewPos, { aspect: 1.5, maxOp: 0.6, near: 8, far: 30 });
+        9.0, y + 3.0, z - 2.6, 5.6, this.viewPos, { aspect: 1.5, maxOp: 0.6, near: 8, far: 30 });
       this.object = addPickProxy(5.5, -80, 7.4, 5.4, 4.2);
     },
   },
