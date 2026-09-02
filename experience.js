@@ -4581,6 +4581,8 @@ window.addEventListener("pointermove", (e) => {
 const loader = document.getElementById("loader");
 const loaderContent = document.getElementById("loaderContent");
 const loaderStatus = document.getElementById("loaderStatus");
+const loaderLive = document.getElementById("loaderLive");
+let loadAnnounced = -1;
 const enterBtn = document.getElementById("enterBtn");
 const enterLabel = document.getElementById("enterLabel");
 const loaderTagline = document.getElementById("loaderTagline");
@@ -4757,6 +4759,14 @@ function updateLoadProgress() {
   const timePct = (elapsed / MIN_LOAD_MS) * 100;
   const shown = loaded ? Math.min(100, timePct) : Math.min(realPct, timePct);
   loaderStatus.textContent = `LOADING ${Math.round(shown)}%`;
+  /* 表示は毎フレーム動かすが、読み上げは25%刻みに落とす。
+     同じ要素に aria-live を付けていたため、読み込み中ずっと
+     「LOADING 1%」「LOADING 2%」…と最大101回アナウンスが積まれていた */
+  const bucket = Math.floor(Math.round(shown) / 25) * 25;
+  if (loaderLive && bucket !== loadAnnounced) {
+    loadAnnounced = bucket;
+    loaderLive.textContent = `読み込み中 ${bucket}%`;
+  }
   /* 以前は全パネル画像（写真・コラージュ、200枚以上）を含む panelPending===0 まで
      待たせていたが、これが初回訪問者を最も長く足止めする箇所だった。
      3D空間の構造（モデル＋配置）さえ整えば旅は始められ、写真は各情景に
@@ -4765,6 +4775,7 @@ function updateLoadProgress() {
   if (loaded && elapsed >= MIN_LOAD_MS) {
     loadCompleted = true;
     loaderStatus.textContent = "READY";
+    if (loaderLive) loaderLive.textContent = "準備ができました。ENTER で入場できます。";
     /* 綿毛が一度だけ大きく揺れる合図（updateFluff参照）。
        「旅の起点が呼びかけ、文字が浮かび上がる」という因果関係にする */
     fluffBurstAt = performance.now();

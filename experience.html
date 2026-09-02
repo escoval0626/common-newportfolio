@@ -1285,11 +1285,15 @@
     <h3 class="zoom-cap__title" lang="en"><span></span></h3>
     <p class="zoom-cap__meta" lang="en"><span></span></p>
     <p class="zoom-cap__hint" lang="en">← → SWITCH — ESC / CLICK TO RETURN</p>
+    <!-- 拡大中の状態（何枚目・シリーズ名・作品名）をスクリーンリーダーへ通知する。
+         視覚的には常に空の1x1px（.sr-only）で、内容だけをzoomCapTextが更新する。
+         この箱は #zoomCap の外に置いてあったが、拡大中は #zoomCap に
+         aria-modal="true" が付く。aria-modal は仮想カーソルをダイアログ配下へ
+         閉じ込めるため、外に居るこの live region の通知が読まれない可能性が
+         あった。拡大専用に作った唯一の通知経路なので、中へ入れる -->
+    <div id="zoomLive" class="sr-only" aria-live="polite" aria-atomic="true"></div>
   </div>
   <button class="zoom-close" id="zoomClose" type="button" aria-label="拡大表示を閉じる" tabindex="-1">×</button>
-  <!-- 拡大中の状態（何枚目・シリーズ名・作品名）をスクリーンリーダーへ通知する。
-       視覚的には常に空の1x1px（.sr-only）で、内容だけをzoomCapTextが更新する -->
-  <div id="zoomLive" class="sr-only" aria-live="polite" aria-atomic="true"></div>
   <!-- 掛かった写真に触れた時のキャプション（下層ページ） -->
   <div class="room-cap" id="roomCap" aria-hidden="true"><i></i><span></span></div>
   <!-- ヒーロータイトル：ポートフォリオTOPのタイトル（冒頭で表示・スクロールで退場） -->
@@ -1334,7 +1338,11 @@
     <button class="loader__enter" id="enterBtn" disabled>
       <span class="loader__enter-label" lang="en" id="enterLabel">ENTER</span>
     </button>
-    <p class="loader__status" lang="en" id="loaderStatus" aria-live="polite">LOADING 0%</p>
+    <!-- 表示は毎フレーム更新するので、この要素自体は読み上げ対象から外す。
+         aria-live を付けたままだと 0→100% で最大101回のアナウンスが積まれる -->
+    <p class="loader__status" lang="en" id="loaderStatus" aria-hidden="true">LOADING 0%</p>
+    <!-- 読み上げ用。25%刻みと READY だけを通知する -->
+    <p class="sr-only" id="loaderLive" aria-live="polite"></p>
   </div>
 
   <!-- ロゴ／ドットナビ／CONTACTでの瞬間移動用フェードヴェール -->
