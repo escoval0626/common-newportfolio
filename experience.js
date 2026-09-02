@@ -3588,7 +3588,14 @@ function buildPlaceRoom(area) {
          画面外へ出たまま数百ms〜1秒ほど留まって見えていた。初回の確定でだけ
          current も一緒に飛ばし、以後の微調整はこれまで通りなめらかに追わせる */
       if (area._room.snapPending) {
-        const snapTarget = positions[area._room.startIdx] || 0;
+        /* 2点だけの部屋（EXHIBITIONS）は、カルーセルではなく壁に掛かった
+           2点の展示として見せる。列は -total/2 から並べてあるので
+           スクロール量0が列そのものの中心になる。
+           1点目を中央に寄せると、1440x900 実測で 1点目が中央(491-949)、
+           2点目が右端ぎりぎり(960-1412)、左に491pxの空白という構図になり、
+           「2点中1点目を表示中」に見えていた。対を中央に据えると左右の
+           余白が揃い、2点しかないことが「選ばれた2点」に反転する */
+        const snapTarget = area._room.pairHang ? 0 : (positions[area._room.startIdx] || 0);
         roomScroll.target = snapTarget;
         if (!area._room.hasSnappedOnce) {
           roomScroll.current = snapTarget;
@@ -3613,6 +3620,8 @@ function buildPlaceRoom(area) {
   const offsetOf = (i) => (area._room && area._room.positions ? area._room.positions[i] : positions[i]) || 0;
   area._room = {
     group: room, mats, meshes, view, look, right,
+    /* 2点だけの部屋は、カルーセルではなく壁に掛かった展示として扱う */
+    pairHang: meshes.length <= 2,
     dirX: dir.x, dirZ: dir.z, /* 傾きを足す時に、正面の向きへ戻す基準が要る */
     span: total0 / 2, positions, startIdx, offsetOf, relayout: layout,
   };
@@ -4234,7 +4243,7 @@ function openGallery(area) {
   /* クリックした情景に対応する写真が、正面に来る位置から始める。
      写真の読み込みで幅が変わるので、並べ直しのたびに取り直させる */
   room.snapPending = true;
-  roomScroll.target = roomScroll.current = room.offsetOf(room.startIdx);
+  roomScroll.target = roomScroll.current = room.pairHang ? 0 : room.offsetOf(room.startIdx);
   /* white-space:nowrap と組ませて、モバイル幅では明示的な位置で2行に割る。
      自動折返しに任せると "SCROL" "L" のように単語の途中で割れていた */
   hint.innerHTML = IS_TOUCH
@@ -5090,7 +5099,7 @@ if (TRAILER) {
       rig.roomView = room.view;
       rig.roomLook = room.look;
       room.snapPending = true;
-      roomScroll.target = roomScroll.current = room.offsetOf(0);
+      roomScroll.target = roomScroll.current = room.pairHang ? 0 : room.offsetOf(0);
       room.mats.forEach((mm) => { mm.uniforms.uOpacity.value = 0; });
       roomOpenedFor = spot.name;
       /* updateRoom(dt) はこのグローバルを見て初めて写真の実体化(ensureRoomTexture)や
