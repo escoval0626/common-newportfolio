@@ -119,6 +119,15 @@ canvas.addEventListener("webglcontextlost", (e) => {
 }, false);
 
 const BG = new THREE.Color("#eeedea");
+/* uBg は自前シェーダーの uniform として渡す。setClearColor/fog は three.js の
+   マネージドAPIなので BG をリニア値のまま渡すのが正しいが、gl_FragColor へ
+   直接出力する自前シェーダー（<colorspace_fragment> を経ない）は sRGB値を
+   そのまま欲しい。uPaper/uShadow に .convertLinearToSRGB() が付いているのと
+   同じ理由で、こちらにも同じ変換をかけた別インスタンスを用意する。
+   実測：uBg にリニア値(0.855,0.847,0.823)が渡り、シェーダーはそれをsRGB値
+   として扱うため実効 #dad8d2（意図は#eeedea）となり、霧の奥で紙に還る
+   はずの粒がその分暗いグレーの靄として残っていた */
+const BG_SRGB = BG.clone().convertLinearToSRGB();
 
 /* 半透明の粒子は重なるほど同じ画素を何度も塗り直すので、
    コストは「窓の面積」にほぼ比例する。小さなプレビューでは軽いのに
@@ -237,7 +246,7 @@ function pushEdges(out, geom, transform, threshold = 25, jitter = 0.006) {
 const pointsUniforms = {
   uTime: { value: 0 },
   uFogDensity: { value: 0.4 },
-  uBg: { value: BG },
+  uBg: { value: BG_SRGB },
   uPr: { value: 1 }, /* 実解像度は applyPixelRatio が入れる */
 };
 
@@ -3268,7 +3277,7 @@ function makeRoomPhotoMat(tex) {
       uMouse: { value: new THREE.Vector2(0.5, 0.5) },
       uParallax: { value: 0 },
       uFogDensity: { value: 0.02 },
-      uBg: { value: BG },
+      uBg: { value: BG_SRGB },
       uDist: { value: 10 },
       uDim: { value: 0 }, /* 触れていない他の写真が引く量 */
       /* 印画紙。板の実寸と、プリント／像それぞれの矩形（板の中の座標） */
