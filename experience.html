@@ -113,6 +113,10 @@
       font-family: var(--font-latin); font-weight: 300; color: var(--ink);
       -webkit-font-smoothing: antialiased;
       cursor: grab;
+      /* ドラッグ／スクロールが主入力の体験。ヒントやバイオの上でなぞると
+         文字が青くハイライトされたまま残り、作品の手前に選択矩形が
+         居座って見えていた（実機で確認）。UIテキストは選択させない */
+      -webkit-user-select: none; user-select: none;
     }
     body.dragging { cursor: grabbing; }
     /* touch-action:none が無いと、Androidで下方向ドラッグがpull-to-refreshに
@@ -1391,6 +1395,10 @@
   <!-- 情景に着いたことを知らせる。画面では大見出しが担っているが、
        読み上げには何も届いていなかった（#zoomLive は拡大表示専用） -->
   <div class="sr-only" id="areaLive" aria-live="polite" aria-atomic="true"></div>
+  <!-- 部屋（写真一覧）に入った/出たことを知らせる。areaLive は「旅の現在地」の
+       表示（updateHud）と1対1で連動して開室時に空文字へ戻るため、同じ要素に
+       室内の案内を書いても即座に消されてしまう。専用の要素に分ける -->
+  <div class="sr-only" id="roomLive" aria-live="polite" aria-atomic="true"></div>
   <p class="hud__hint" id="hint"><span lang="en">SCROLL / DRAG</span> — 綿毛を追う</p>
     <div class="hud__wave" aria-hidden="true">
       <svg width="92" height="14" viewBox="0 0 92 14" fill="none" xmlns="http://www.w3.org/2000/svg">

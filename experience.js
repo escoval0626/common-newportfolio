@@ -1869,10 +1869,13 @@ const AREAS = [
     name: "ARCHITECTURES", num: "03", t: 0.502,
     center: new THREE.Vector3(-7.5, 1.4, -64),
     viewPos: new THREE.Vector3(-2.6, 1.7, -59),
-    /* dy はカメラを上げ、lookDy は注視点を上げる。両方 0.6 なので相殺され、
-       実効の仰角は小さい。一度 dy -0.2 / lookDy 2.5 にして 13.9° の見上げに
-       したが、実機で絵の入り方が崩れたため元に戻してある */
-    gesture: { dy: 0.6, lookDy: 0.6 }, /* 見上げるように上昇して近づく */
+    /* dy はカメラを上げ、lookDy は注視点を上げる。以前は両方0.6で相殺され
+       実効の仰角がほぼ0だった。一度 dy -0.2 / lookDy 2.5（差2.7）にして
+       13.9°の見上げにしたが、差が大きすぎて絵の入り方が崩れたため戻した
+       経緯がある。今回は差を抑えて（0.1 / 0.9、差0.8）再挑戦し、実機の
+       スクリーンショットで手前の柵・地面が増え、塔が空へ抜けて見える
+       ことを確認した上でこの値にしてある */
+    gesture: { dy: 0.1, lookDy: 0.9 }, /* 見上げるように、地を残しつつ塔を空へ抜く */
     hotspot: "View the series",
     lines: ["直線の中に、", "人の祈りを探す。"],
     /* 北郷さんの実写。題は1枚ずつ実物を見て付けている */
@@ -3086,7 +3089,19 @@ function measureAnchor(a) {
   a.baseW = w;
   a.baseH = h;
 }
+let anchorsWrapForcedShown = true;
 function updateAnchors() {
+  /* #anchors（旅の詩・CTAの親）のopacityは、部屋を開閉するGSAPタイムライン
+     （tl）だけが動かす。上のtl.kill()の各所に個別の手当てを入れたが、
+     見つけていない経路で中途半端な値のまま固まる可能性はゼロにできない。
+     「部屋でも遷移中でもないなら#anchorsは必ず1」という不変条件を
+     ここで毎フレーム保証しておけば、経路をすべて把握できていなくても
+     詩やCTAが写真の上に焼き付いたまま残ることはなくなる */
+  const shouldShow = !galleryOpen && !transitionActive;
+  if (shouldShow !== anchorsWrapForcedShown) {
+    anchorsWrapForcedShown = shouldShow;
+    if (shouldShow) gsap.set(anchorsWrap, { opacity: 1 });
+  }
   for (const a of domAnchors) {
     /* 追い越しの手前で送り出す。
        以前はここで _v.z > 1（＝カメラの背後へ回った）を見て opacity を "0" に
@@ -3199,7 +3214,13 @@ function updateAnchors() {
       proximity = THREE.MathUtils.clamp(1 - Math.abs(rig.progress - a.beatT) / 0.15, 0, 1);
       proximity = Math.pow(Math.min(1, proximity * 1.35), LINGER);
     } else {
-      const w = a.area ? a.area.currentW : 1;
+      /* 情景の間隔（0.117）と、この後の(w-0.22)/0.6という可視化の窓
+         （実質 |p - a.t| < 0.0585）を並べると、その和はほぼ0.117＝境界
+         ぴったりで、浮動小数の誤差ひとつで両隣が同時に0.22を超えて
+         同時に読める状態になっていた（実機で複数箇所を確認）。
+         w の値そのものは崩さず、「今のcapArea以外は出さない」という
+         排他をここに足すだけで、その一瞬の重なりを確実に消せる */
+      const w = a.area ? (a.area === rig.capArea ? a.area.currentW : 0) : 1;
       proximity = Math.pow(THREE.MathUtils.clamp((w - 0.22) / 0.6, 0, 1), LINGER);
     }
     /* 同フレームの後続アンカー（ホットスポット）が裾を知るために控える */
@@ -4087,6 +4108,13 @@ function focusIfKeyboard(el) { if (el && lastInputKeyboard) el.focus(); }
    thumb（41〜89KB）を並べるとSNAPSだけで1.56MB落ちることになる。 */
 const roomStrip = document.getElementById("roomStrip");
 let stripItems = [], stripIdx = -1;
+/* サムネイル各々にはpointerdown/wheelの伝播停止が付いているが（下記
+   buildRoomStrip）、サムネイルとサムネイルの間の隙間・上下の余白
+   （padding/gap）はコンテナ自身が受けてしまい、素通しのままだった。
+   そこを起点にドラッグすると、ストリップ自体は動かないのに奥の写真の
+   列だけが流れる（実機で確認）。コンテナ自身にも同じ手当てを一度だけ足す */
+roomStrip.addEventListener("pointerdown", (e) => e.stopPropagation());
+roomStrip.addEventListener("wheel", (e) => e.stopPropagation(), { passive: true });
 
 function stripUrl(url) {
   const i = url.lastIndexOf("/");
@@ -4349,10 +4377,23 @@ function openGallery(area) {
   roomBack.classList.add("is-visible");
   hud.classList.add("is-room");   /* 部屋の中だけ効かせたいCSSのための状態 */
   buildRoomStrip(room);           /* 全体量と現在地を出す一覧 */
+  /* 部屋の中は areaLive（旅の現在地）が空文字に戻るため無音になっていた。
+     開いたシリーズ名と点数だけでも読み上げに届かせる */
+  if (roomLive) roomLive.textContent = area.name + "。シリーズを開きました。" + area.photos.length + "点。";
   roomBack.tabIndex = 0; /* 非表示中はTab順から外している。表示に合わせて戻す */
   focusIfKeyboard(roomBack); /* キーボード操作の起点。指で開いた時は枠を出さない */
   transitionActive = true;
-  if (tl) tl.kill();
+  if (tl) {
+    /* tl.kill() は「その時点の値」で止めるだけで、0や1へは戻さない。
+       部屋を開いている途中でもう一度開こうとした場合など、前のtlが
+       道半ばで死んだ結果 #anchors の opacity が 0.0595 のような半端な
+       値のまま固着し、直前の詩やCTAが写真の上にうっすら焼き付いて
+       残るのを実機で確認した。killするのは「前のtlがある時」だけなので、
+       通常の1回目の開場（tlがまだnull）はこの分岐を通らず、意図した
+       0.5秒のフェードアウトはそのまま残る */
+    tl.kill();
+    gsap.set(anchorsWrap, { opacity: 0 });
+  }
 
   /* このエリアの3Dコラージュ絵（addArtwork、線画+水彩の点描が1枚あたり
      数千個規模）は、部屋（カルーセル）に入っても元の位置に残ったまま
@@ -4368,6 +4409,7 @@ function openGallery(area) {
       transitionActive = false;
       activeRoom = room;
       mine.forEach((a) => { a.group.visible = false; });
+      gsap.set(anchorsWrap, { opacity: 0 }); /* 途中で割り込まれず最後まで走った時の確実な終端 */
     },
     onReverseComplete: () => {
       transitionActive = false;
@@ -4376,6 +4418,7 @@ function openGallery(area) {
       activeRoom = null;
       room.group.visible = false; /* 旅に戻ったら、また伏せる */
       document.body.style.cursor = "";
+      gsap.set(anchorsWrap, { opacity: 1 }); /* 旅の詩・CTAはここから各自のcurrentWで再び制御される */
     },
   });
   tl.to(rig, { detour: 1, duration: 1.9, ease: "power2.inOut" }, 0)
@@ -4467,6 +4510,7 @@ function closeGallery(instant = false) {
   roomBack.classList.remove("is-visible");
   hud.classList.remove("is-room");
   clearRoomStrip();
+  if (roomLive) roomLive.textContent = "";
   roomBack.tabIndex = -1; /* 見えないボタンにTabで止まり、Enterで意図せず旅の外へ出てしまうのを防ぐ */
   /* 部屋に入る前にフォーカスしていた場所（ホットスポット等）へ戻す。
      その要素が消えている場合（ドット操作等）は無理に追わず諦める */
@@ -4728,6 +4772,7 @@ const caption = document.getElementById("caption");
 const captionNum = document.getElementById("captionNum");
 const captionTitle = document.getElementById("captionTitle");
 const areaLive = document.getElementById("areaLive");
+const roomLive = document.getElementById("roomLive");
 const progressBar = document.getElementById("progressBar");
 const dotsWrap = document.getElementById("dots");
 
