@@ -2427,7 +2427,8 @@ window.addEventListener("wheel", (e) => {
        送りたい時は矢印キーで明示的に操作する */
     if (activeRoom.zoomed) return;
     activeRoom.snapPending = false; /* 自分で動かし始めたら、もう勝手に戻さない */
-    roomScroll.target += dy * 0.012;
+    if (activeRoom.sphere) sphereTurn(activeRoom, dy * SPHERE.turnPerPx * 0.5);
+    else roomScroll.target += dy * 0.012;
     rig.lastInput = performance.now();
     return;
   }
@@ -2478,8 +2479,16 @@ window.addEventListener("pointermove", (e) => {
          デッドゾーンにし、タップ中は写真を完全に静止させる */
       activeRoom.snapPending = false;
       if (dragMoved > 6) {
-        roomScroll.target -= dx * 0.016;
-        roomScroll.current = roomScroll.target;
+        if (activeRoom.sphere) {
+          /* 指に 1:1 で追従し、惰性は離した後に残す（photo-grid と同じ係数） */
+          const s = activeRoom.sphere;
+          s.spinTo = null; s.aimIdx = null;
+          s.spin += dx * SPHERE.turnPerPx;
+          s.spinVel = dx * SPHERE.turnPerPx * 9;
+        } else {
+          roomScroll.target -= dx * 0.016;
+          roomScroll.current = roomScroll.target;
+        }
       }
       lastX = e.clientX; lastY = e.clientY;
       rig.lastInput = performance.now();
@@ -3469,6 +3478,29 @@ ROOM_PLACEHOLDER_TEX.needsUpdate = true;
    先読みが確保できる線まで絞る */
 const ROOM_WINDOW_RADIUS = (ROW_H * 1.5 + ROOM_GAP) * (IS_TOUCH ? 2.2 : 6);
 
+/* ============================================================
+   球（PC だけ）。UNTITLED PORTFOLIO の下層（photo-grid の cloud）と同じ見せ方。
+   一列に並べて横に流す代わりに、印画紙をフィボナッチ球の面に置き、
+   画面内で 23° 傾いた軸のまわりにゆっくり自転させる。板はつねにカメラへ
+   正対する（ビルボード）ので、近いものが大きく・遠いものが小さく見えるだけで
+   作品そのものは歪まない。ドラッグ／ホイールで回し、クリックで 1 枚を手前へ。
+   タッチ端末と狭い幅は従来のカルーセル（球は指で回す物語がまだ無い）。
+   2 点だけの部屋（EXHIBITIONS）も壁掛けのまま。
+   数値は UNTITLED 側の実測（tilt 23°・1 周 105 秒＝3.438°/s）をそのまま使う */
+const SPHERE_ROOM = !IS_TOUCH && !MOBILE_LAYOUT;
+const SPHERE = {
+  r0: 6.4,          /* 17 点のときの半径。点数の平方根で伸縮し、面の密度を保つ（5.4 だと重なりが強すぎた） */
+  fill: 0.86,       /* 画面の半分の高さのうち、球（極の板の端まで）に使う割合。下のサムネ帯に被らない線 */
+  tilt: 23,         /* 回転軸が画面の面内で傾く角度（度） */
+  drift: 3.438,     /* 自転の速さ（度/秒）。手を触れない間だけ回る */
+  camDrop: 3.0,     /* カメラは球の中心よりこれだけ下から見上げる（地面が画面下に残る） */
+  lookDrop: 0.9,    /* 注視点は中心より少し下＝球を画面のやや上に置き、下のサムネ帯から離す */
+  turnPerPx: 0.004, /* ドラッグ 1px あたりの回転（rad）。photo-grid と同じ */
+  dealOut: 0.55,    /* 開いた瞬間、中心から面へ板が散っていく時間（秒） */
+  lag: 0.055,       /* 板ごとのずれ（正面側から順に） */
+};
+const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
+
 /* 壁掛け表示は3D空間内の小さな板で、画面上の占有率も低い。
    フル解像度（最大2048px、平均400KB超）は明らかに過剰品質なので、
    一覧では960px版のサムネイル（平均66KB程度）を使い、拡大して
@@ -3556,6 +3588,7 @@ function buildPlaceRoom(area) {
      不明瞭になるため、部屋はカテゴリごとに独立させる */
   const shots = (area.photos || []).map(([u, c, award]) => ({ u, c, award, ar: area }));
   const startIdx = 0;
+  const sphere = SPHERE_ROOM && shots.length > 2;
   const GAP = ROOM_GAP, PAD = ROOM_PAD;
   const yBase = GROUND_Y + 2.5;
   const faceY = Math.atan2(-dir.x, -dir.z);
@@ -3625,6 +3658,13 @@ function buildPlaceRoom(area) {
         u.uCrop.value.copy(crop);
       }
     }
+    if (sphere) {
+      /* 球では位置を毎フレーム updateSphere が決める。ここは寸法だけ */
+      positions = meshes.map((_, i) => i);
+      for (const m of meshes) m.userData.laidOut = true;
+      if (area._room) area._room.positions = positions;
+      return;
+    }
     const total = meshes.reduce((s, m) => s + m.userData.w, 0) + GAP * (meshes.length - 1);
     let cur = -total / 2;
     positions = [];
@@ -3685,6 +3725,41 @@ function buildPlaceRoom(area) {
   }
   layout();
 
+  let sph = null;
+  if (sphere) {
+    const n = meshes.length;
+    const R = SPHERE.r0 * Math.sqrt(n / 17);
+    const pole = 1 - 1 / n; /* いちばん極に近い板の高さ（半径比） */
+    const tanH = Math.tan(THREE.MathUtils.degToRad(camera.fov * 0.5));
+    /* 極の板の端まで画面に収まる距離。photo-grid は距離から半径を解くが、
+       ここは半径を先に決めて距離を解く（点数で半径が変わっても同じ収まりになる） */
+    const stand = (pole * R + ROW_H / 2 + 0.2) / (SPHERE.fill * tanH);
+    const up = new THREE.Vector3(0, 1, 0);
+    const back = dir.clone().negate(); /* カメラ側 */
+    const lean = THREE.MathUtils.degToRad(SPHERE.tilt);
+    /* 回転軸：画面の面内で、鉛直から right 側へ lean だけ倒す */
+    const axis = up.clone().multiplyScalar(Math.cos(lean)).addScaledVector(right, Math.sin(lean)).normalize();
+    /* 球の底の板が地面に刺さらない高さ */
+    const cy = GROUND_Y + R + ROW_H / 2 + 0.4;
+    const center = area.center.clone().addScaledVector(dir, 0.5 + stand);
+    center.y = cy;
+    /* フィボナッチ球：高さは等面積に、方位は黄金角ずつ */
+    meshes.forEach((m, i) => {
+      const y = 1 - (2 * (i + 0.5)) / n;
+      const rr = Math.sqrt(Math.max(0, 1 - y * y));
+      const ang = i * GOLDEN_ANGLE;
+      m.userData.unit = right.clone().multiplyScalar(Math.sin(ang) * rr)
+        .addScaledVector(up, y)
+        .addScaledVector(back, Math.cos(ang) * rr);
+    });
+    sph = {
+      R, stand, axis, center, back,
+      drift: THREE.MathUtils.degToRad(SPHERE.drift),
+      spin: 0, spinVel: 0, spinTo: null, aimIdx: null,
+      openAt: -1, /* 板が面へ散り始める時刻（clock 基準）。-1 は配置済み扱い */
+    };
+  }
+
   scene.add(room);
   /* 部屋は近づいた時点で先に組んでおく（openGallery内で初めて組むと、写真枚数分の
      生成コストが1フレームに乗って動きがカクつく）。ただし組んだだけで見せてはいけない。
@@ -3707,6 +3782,13 @@ function buildPlaceRoom(area) {
   view.y = GROUND_Y + 2.35;
   const look = area.center.clone().addScaledVector(dir, 9.5);
   look.y = yBase;
+  if (sph) {
+    /* 球の中心から stand だけ手前、少し下から見上げる */
+    view.copy(sph.center).addScaledVector(dir, -sph.stand);
+    view.y = sph.center.y - SPHERE.camDrop;
+    look.copy(sph.center);
+    look.y -= SPHERE.lookDrop;
+  }
   const total0 = meshes.reduce((s, m) => s + m.userData.w, 0) + GAP * (meshes.length - 1);
   /* i 番目の写真を正面に持ってくるためのスクロール量 */
   const offsetOf = (i) => (area._room && area._room.positions ? area._room.positions[i] : positions[i]) || 0;
@@ -3716,8 +3798,139 @@ function buildPlaceRoom(area) {
     pairHang: meshes.length <= 2,
     dirX: dir.x, dirZ: dir.z, /* 傾きを足す時に、正面の向きへ戻す基準が要る */
     span: total0 / 2, positions, startIdx, offsetOf, relayout: layout,
+    sphere: sph,
   };
   return area._room;
+}
+
+/* ---- 球の計算（photo-grid の grid-layout.js: turnedDirection / frontSpin と同じ式） ---- */
+const _sd = new THREE.Vector3(), _sq = new THREE.Quaternion(), _se = new THREE.Euler(), _sc = new THREE.Vector3();
+/* 板 m の単位方向を、軸まわりに spin だけ回したもの（_sd を使い回す） */
+function sphereDir(r, m, spin) {
+  return _sd.copy(m.userData.unit).applyAxisAngle(r.sphere.axis, spin);
+}
+/* 板 m がいちばんカメラ側（back）へ来る spin。
+   Rodrigues の式で back 成分は A cos + B sin + C になるので、最大は atan2(B, A) */
+function sphereFrontSpin(r, m) {
+  const u = r.sphere.axis, d = m.userData.unit, z = r.sphere.back;
+  const ud = u.dot(d);
+  const a = d.dot(z) - u.dot(z) * ud;
+  const b = _sc.crossVectors(u, d).dot(z);
+  return Math.atan2(b, a);
+}
+/* いま正面にいちばん近い板 */
+function sphereFrontIdx(r) {
+  let best = -Infinity, idx = 0;
+  r.meshes.forEach((m, i) => {
+    const z = sphereDir(r, m, r.sphere.spin).dot(r.sphere.back);
+    if (z > best) { best = z; idx = i; }
+  });
+  return idx;
+}
+/* 手で回す（rad）。狙いは捨て、惰性を残す */
+function sphereTurn(r, delta) {
+  const s = r.sphere;
+  s.spinTo = null;
+  s.aimIdx = null;
+  s.spin += delta;
+  s.spinVel = delta * 9;
+}
+/* i 番目を正面へ。近い方の向きで回す（隣へ行くのに一周しない） */
+function sphereTurnTo(r, i) {
+  const m = r.meshes[i];
+  if (!m) return;
+  const full = Math.PI * 2;
+  let want = sphereFrontSpin(r, m);
+  want += Math.round((r.sphere.spin - want) / full) * full;
+  r.sphere.spinTo = want;
+  r.sphere.aimIdx = i;
+  r.sphere.spinVel = 0;
+}
+/* 板 m の面上の定位置（回転と散り具合を反映）を out に入れて返す */
+function sphereSpot(r, m, out) {
+  const s = r.sphere;
+  sphereDir(r, m, s.spin);
+  const k = m.userData.dealt == null ? 1 : m.userData.dealt;
+  /* 散る前は中心のやや手前にまとまっている（photo-grid の entry と同じ考え） */
+  return out.copy(s.center).addScaledVector(s.back, 0.6 * (1 - k)).addScaledVector(_sd, s.R * k);
+}
+
+/* カルーセルと球で共通の「現在地」と「i 番目へ」 */
+function roomFrontIdx(r) {
+  if (r.sphere) return sphereFrontIdx(r);
+  let idx = 0, best = Infinity;
+  const positions = r.positions || [];
+  for (let i = 0; i < positions.length; i++) {
+    const d = Math.abs((positions[i] || 0) - roomScroll.current);
+    if (d < best) { best = d; idx = i; }
+  }
+  return idx;
+}
+function roomGoTo(r, i) {
+  r.snapPending = false;
+  if (r.sphere) sphereTurnTo(r, i);
+  else roomScroll.target = r.offsetOf(i);
+}
+
+/* 自転・狙い・惰性。壁へ戻っている板がある間は止める（着地点を動かさない） */
+function updateSphereSpin(r, dt) {
+  const s = r.sphere;
+  if (r.locked && r.locked.size) return;
+  if (s.spinTo !== null) {
+    const gap = s.spinTo - s.spin;
+    s.spin += gap * (REDUCE_MOTION ? 1 : 1 - Math.pow(0.92, dt * 60));
+    if (Math.abs(gap) < 1e-4) { s.spin = s.spinTo; s.spinTo = null; s.aimIdx = null; }
+    return;
+  }
+  if (r.zoomed) return; /* 1 枚を見ている間は回さない（戻した時に同じ所へ還す） */
+  if (dragging && activeRoom === r) return; /* 手が触れている */
+  if (!REDUCE_MOTION) s.spin += s.drift * dt;
+  s.spin += s.spinVel * dt;
+  s.spinVel *= Math.pow(0.06, dt);
+  if (Math.abs(s.spinVel) < 1e-4) s.spinVel = 0;
+}
+
+/* 板の姿勢（毎フレーム）。部屋が開く途中（activeRoom になる前）から必要なので
+   updateRoom とは別にし、メインループが openingRoom に対しても呼ぶ */
+function updateSphere(r, dt) {
+  const s = r.sphere;
+  updateSphereSpin(r, dt);
+  const now = clock.elapsedTime;
+  /* 読み込みは正面側から順に、全部（球は全面が見えるので窓で絞らない） */
+  if (!s.loadStarted) {
+    r.meshes.map((m) => ({ m, z: sphereDir(r, m, s.spin).dot(s.back) }))
+      .sort((a, b) => b.z - a.z)
+      .forEach(({ m }) => ensureRoomTexture(m));
+    s.loadStarted = true;
+  }
+  /* 散る順番：正面側の板から。順位は開いた時に一度だけ決める */
+  if (s.openAt >= 0 && !s.dealOrder) {
+    s.dealOrder = r.meshes.map((m) => ({ m, z: sphereDir(r, m, s.spin).dot(s.back) }))
+      .sort((a, b) => b.z - a.z);
+    s.dealOrder.forEach(({ m }, rank) => { m.userData.lag = rank * SPHERE.lag; });
+  }
+  for (const m of r.meshes) {
+    if (m === r.zoomed || (r.locked && r.locked.has(m))) continue; /* GSAP が握っている */
+    const d = m.userData;
+    let k = 1;
+    if (s.openAt >= 0) {
+      const t = (now - s.openAt - (d.lag || 0)) / (REDUCE_MOTION ? 0.001 : SPHERE.dealOut);
+      const p = THREE.MathUtils.clamp(t, 0, 1);
+      k = 1 - Math.pow(1 - p, 3); /* easeOutCubic */
+    }
+    d.dealt = k;
+    if (!d.wallPos) d.wallPos = new THREE.Vector3();
+    sphereSpot(r, m, d.wallPos);
+    const lift = m.material.uniforms.uHover.value;
+    /* 触れた 1 枚はカメラ側へわずかに浮く */
+    m.position.copy(d.wallPos).addScaledVector(s.back, lift * 0.25);
+    /* ビルボード：つねにカメラへ正対し、触れた時だけカーソルの方へ傾く */
+    _se.set(d.tiltX || 0, d.tiltY || 0, 0);
+    _sq.setFromEuler(_se);
+    m.quaternion.copy(camera.quaternion).multiply(_sq);
+    const g = (0.35 + 0.65 * k) * (1 + lift * 0.03);
+    m.scale.set(d.w * g, d.h * g, 1);
+  }
 }
 
 /* ============================================================
@@ -3873,13 +4086,29 @@ function returnToWall(mesh, tlLocal, at, dur) {
   const q1 = (d.homeQuat || mesh.quaternion).clone();
   if (q0.dot(q1) < 0) q1.set(-q1.x, -q1.y, -q1.z, -q1.w);
   const qs = { t: 0 };
-  tlLocal
-    .to(mesh.position, { x: wallPos.x, y: wallPos.y, z: wallPos.z, duration: dur }, at)
-    .to(mesh.scale, { x: wallScale.x, y: wallScale.y, duration: dur }, at)
-    .to(qs, {
-      t: 1, duration: dur,
-      onUpdate: () => mesh.quaternion.slerpQuaternions(q0, q1, qs.t),
-    }, at);
+  if (activeRoom && activeRoom.sphere && activeRoom.meshes.includes(mesh)) {
+    /* 球の定位置はカメラの揺れで毎フレーム動くので、固定値へ tween せず、
+       進捗だけを tween して最新の定位置へ寄せる（向きもその時のカメラへ正対） */
+    const r = activeRoom, p0 = mesh.position.clone(), tgt = new THREE.Vector3();
+    tlLocal
+      .to(mesh.scale, { x: wallScale.x, y: wallScale.y, duration: dur }, at)
+      .to(qs, {
+        t: 1, duration: dur,
+        onUpdate: () => {
+          sphereSpot(r, mesh, tgt);
+          mesh.position.lerpVectors(p0, tgt, qs.t);
+          mesh.quaternion.slerpQuaternions(q0, camera.quaternion, qs.t);
+        },
+      }, at);
+  } else {
+    tlLocal
+      .to(mesh.position, { x: wallPos.x, y: wallPos.y, z: wallPos.z, duration: dur }, at)
+      .to(mesh.scale, { x: wallScale.x, y: wallScale.y, duration: dur }, at)
+      .to(qs, {
+        t: 1, duration: dur,
+        onUpdate: () => mesh.quaternion.slerpQuaternions(q0, q1, qs.t),
+      }, at);
+  }
   if (wallUniforms) {
     tlLocal
       .to(u.uPlane.value, { x: wallUniforms.plane.x, y: wallUniforms.plane.y, duration: dur }, at)
@@ -3900,6 +4129,7 @@ function openZoom(mesh) {
   const r = activeRoom;
   if (!r || r.zoomed) return;
   r.zoomed = mesh;
+  if (r.sphere) sphereTurnTo(r, r.meshes.indexOf(mesh)); /* 戻した時に正面へ還るよう、裏で球を回しておく */
   const d = mesh.userData;
   trackEvent("zoom_open", { area: d.area ? d.area.name : null, idx: r.meshes.indexOf(mesh) });
   ensureRoomTexture(mesh); /* ウィンドウ外から選ばれた場合に備え、確実にロードを始める */
@@ -3982,8 +4212,8 @@ function stepZoom(dir) {
   r.zoomed = next;
   ensureFullTexture(next); /* 送り先も同じく大きく見るので、フル解像度へ差し替える */
   lockMesh(r, prev); /* 退く1枚も、戻り切るまでは触らせない */
-  /* 閉じた時にこの写真が正面に来るよう、裏で列も合わせておく */
-  roomScroll.target = r.positions[n] ?? roomScroll.target;
+  /* 閉じた時にこの写真が正面に来るよう、裏で列（球なら回転）も合わせておく */
+  roomGoTo(r, n);
 
   zoomCapText(next, n, r.meshes.length);
   const spans = zoomCap.querySelectorAll("span");
@@ -4145,8 +4375,7 @@ function buildRoomStrip(r) {
       /* 読み込みが進むたびに列を開いた位置へ引き戻す snapPending は、
          自分で動かした時点で解除する約束になっている（2356行付近と同じ）。
          ここで解除しないと、飛んだ先からすぐ先頭へ戻されてしまう */
-      r.snapPending = false;
-      roomScroll.target = r.offsetOf(i);
+      roomGoTo(r, i);
     });
     roomStrip.appendChild(b);
     return b;
@@ -4177,10 +4406,7 @@ function updateRoomStrip(r, hit) {
   if (hit && hit.object && hit.object.userData && hit.object.userData.idx != null) {
     idx = hit.object.userData.idx;
   } else {
-    for (let i = 0; i < r.positions.length; i++) {
-      const d = Math.abs((r.positions[i] || 0) - roomScroll.current);
-      if (d < best) { best = d; idx = i; }
-    }
+    idx = roomFrontIdx(r);
   }
   if (idx === stripIdx) return;
   stripIdx = idx;
@@ -4198,6 +4424,7 @@ function updateRoomStrip(r, hit) {
   }
 }
 let activeRoom = null;
+let openingRoom = null; /* 開く途中・閉じる途中（tl が走っている間）の部屋。球の姿勢更新に要る */
 /* ?debug=1 のときだけ内部状態を覗けるようにする（挙動の切り分け用） */
 if (DEV_TOOLS_ALLOWED && new URLSearchParams(location.search).get("debug") === "1") {
   window.__xp = {
@@ -4208,6 +4435,7 @@ if (DEV_TOOLS_ALLOWED && new URLSearchParams(location.search).get("debug") === "
     get tl() { return tl; },
     get zoomTl() { return zoomTl; },
     gsap, bringToFront, ROW_H, EDGE, EDGE_BOTTOM, ROOM_PAD, openZoom, closeZoom,
+    sphereTurnTo, sphereTurn, sphereFrontIdx, roomGoTo, SPHERE, get openingRoom() { return openingRoom; },
     openGallery, closeGallery: () => closeGallery(), AREAS,
     camera, scene, THREE,
     rig, updateRoom, artworks, frame, updateAnchors,
@@ -4238,8 +4466,9 @@ const _rv = new THREE.Vector3();
 function updateRoom(dt) {
   if (!activeRoom) return;
   const r = activeRoom;
+  /* 球は updateSphere（メインループ側）が姿勢と読み込みを決める。ここでは触らない */
   /* 1枚を見ている間は列を動かさない（横に流れると見ている物が逃げる） */
-  if (!r.zoomed) {
+  if (!r.sphere && !r.zoomed) {
     /* ±span（板の総幅の半分）だと最後の1枚を正面に置いた先にも
        板半分ぶんの余白が残ってしまう。実際の並び位置の両端で止める */
     const positions = r.positions;
@@ -4306,6 +4535,7 @@ function updateRoom(dt) {
     const ty = on ?  rig.mouseDamped.x * 0.10 : 0;
     d.tiltX = (d.tiltX || 0) + (tx - (d.tiltX || 0)) * Math.min(1, dt * 5);
     d.tiltY = (d.tiltY || 0) + (ty - (d.tiltY || 0)) * Math.min(1, dt * 5);
+    if (r.sphere) continue; /* 位置・向き・大きさは updateSphere が決めた */
     m.rotation.x = d.tiltX;
     m.rotation.y = Math.atan2(-r.dirX, -r.dirZ) + d.tiltY;
     m.position.y = d.baseY + lift * 0.10;
@@ -4362,6 +4592,18 @@ function openGallery(area) {
   /* オーバーレイを開かず、カメラが奥の場所（回廊の奥）へ進む */
   const room = buildPlaceRoom(area);
   room.group.visible = true; /* 先に組んで伏せてあるので、ここで初めて見せる */
+  openingRoom = room;
+  if (room.sphere) {
+    const s = room.sphere;
+    /* 前回見ていた（または先頭の）板が正面に来る向きから始める */
+    s.spin = sphereFrontSpin(room, room.meshes[room.startIdx] || room.meshes[0]);
+    s.spinTo = null; s.spinVel = 0; s.aimIdx = null;
+    /* カメラが寄り始めて少し経ってから、中心から面へ散る */
+    s.openAt = clock.elapsedTime + 0.6;
+    s.dealOrder = null;
+    room.meshes.forEach((m) => { m.userData.dealt = 0; });
+    updateSphere(room, 0);
+  }
   rig.roomView = room.view;
   rig.roomLook = room.look;
   /* クリックした情景に対応する写真が、正面に来る位置から始める。
@@ -4372,7 +4614,9 @@ function openGallery(area) {
      自動折返しに任せると "SCROL" "L" のように単語の途中で割れていた */
   hint.innerHTML = IS_TOUCH
     ? '<span lang="en">SWIPE</span> — 流す<span class="hud__hint__sep"></span><br class="hud__hint__br"><span lang="en">TAP</span> — 大きく見る'
-    : '<span lang="en">DRAG / SCROLL</span> — 流す<span class="hud__hint__sep"></span><br class="hud__hint__br"><span lang="en">CLICK</span> — 大きく見る';
+    : room.sphere
+      ? '<span lang="en">DRAG / SCROLL</span> — 回す<span class="hud__hint__sep"></span><br class="hud__hint__br"><span lang="en">CLICK</span> — 大きく見る'
+      : '<span lang="en">DRAG / SCROLL</span> — 流す<span class="hud__hint__sep"></span><br class="hud__hint__br"><span lang="en">CLICK</span> — 大きく見る';
   hint.classList.remove("is-faded");
   roomBack.classList.add("is-visible");
   hud.classList.add("is-room");   /* 部屋の中だけ効かせたいCSSのための状態 */
@@ -4416,6 +4660,7 @@ function openGallery(area) {
       galleryOpen = false;
       rig.detour = 0;
       activeRoom = null;
+      openingRoom = null;
       room.group.visible = false; /* 旅に戻ったら、また伏せる */
       document.body.style.cursor = "";
       gsap.set(anchorsWrap, { opacity: 1 }); /* 旅の詩・CTAはここから各自のcurrentWで再び制御される */
@@ -4522,12 +4767,7 @@ function closeGallery(instant = false) {
      以前は毎回 startIdx=0（先頭）に戻り、22枚あるシリーズを見返すたびに
      最初から流し直す必要があった */
   if (activeRoom && activeRoom.positions && activeRoom.positions.length) {
-    let bestIdx = 0, bestD = Infinity;
-    activeRoom.positions.forEach((p, i) => {
-      const d = Math.abs(p - roomScroll.current);
-      if (d < bestD) { bestD = d; bestIdx = i; }
-    });
-    activeRoom.startIdx = bestIdx;
+    activeRoom.startIdx = roomFrontIdx(activeRoom);
   }
   /* openGallery側で描画を止めたエリアの絵を、フェードインが効くよう
      先に見える状態へ戻す（visible=falseのままだとopacityを戻しても映らない） */
@@ -4546,6 +4786,7 @@ function closeGallery(instant = false) {
     transitionActive = false;
     galleryOpen = false;
     rig.detour = 0;
+    openingRoom = null;
     if (closingRoom) closingRoom.group.visible = false;
     return;
   }
@@ -4580,20 +4821,25 @@ window.addEventListener("keydown", (e) => {
     const positions = activeRoom.positions || [];
     if (positions.length) {
       let idx = 0, best = Infinity;
-      for (let i = 0; i < positions.length; i++) {
-        const d = Math.abs(positions[i] - roomScroll.target);
-        if (d < best) { best = d; idx = i; }
+      if (activeRoom.sphere) {
+        /* 球では、回っている最中なら狙っている板、止まっていれば正面の板を起点にする
+           （連打した時に、まだ届いていない正面から数え直して同じ板へ戻らないように） */
+        const s = activeRoom.sphere;
+        idx = s.spinTo !== null && s.aimIdx != null ? s.aimIdx : sphereFrontIdx(activeRoom);
+      } else {
+        for (let i = 0; i < positions.length; i++) {
+          const d = Math.abs(positions[i] - roomScroll.target);
+          if (d < best) { best = d; idx = i; }
+        }
       }
       if (e.key === "ArrowRight" || e.key === "ArrowDown") {
-        activeRoom.snapPending = false;
-        roomScroll.target = positions[Math.min(idx + 1, positions.length - 1)];
+        roomGoTo(activeRoom, Math.min(idx + 1, positions.length - 1));
         rig.lastInput = performance.now();
         e.preventDefault();
         return;
       }
       if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
-        activeRoom.snapPending = false;
-        roomScroll.target = positions[Math.max(idx - 1, 0)];
+        roomGoTo(activeRoom, Math.max(idx - 1, 0));
         rig.lastInput = performance.now();
         e.preventDefault();
         return;
@@ -5283,7 +5529,7 @@ if (TRAILER) {
     } else if (t < spot.closeStart) {
       detour = 1;
       /* 見せ場を1枚だけで終わらせず、隣の1枚へゆっくり流す */
-      if (room.positions && room.positions.length > 1) {
+      if (!room.sphere && room.positions && room.positions.length > 1) {
         const k = seg(t, spot.holdStart + spot.holdDur * 0.3, spot.holdStart + spot.holdDur * 0.85);
         roomScroll.target = THREE.MathUtils.lerp(room.positions[0], room.positions[1], k);
       }
@@ -5294,6 +5540,7 @@ if (TRAILER) {
     const op = THREE.MathUtils.clamp(detour, 0, 1) * 0.98;
     room.mats.forEach((mm) => { mm.uniforms.uOpacity.value = op; });
     updateCamera(dt);
+    if (room.sphere) updateSphere(room, dt);
     updateRoom(dt);
     /* 個々の写真のロード完了フェードは通常 GSAP tween が担うが、GSAP の
        ticker は requestAnimationFrame 依存で、撮影中の tab がバックグラウンド
@@ -5543,6 +5790,11 @@ function frame() {
   updateContactBloom(dt);
   updatePanels();
   updateArtworks();
+  {
+    /* 球は、開く途中（openingRoom）・閉じる途中も含めて見えている間ずっと姿勢を更新する */
+    const liveRoom = activeRoom || openingRoom;
+    if (liveRoom && liveRoom.sphere && liveRoom.group.visible) updateSphere(liveRoom, dt);
+  }
   updateRoom(dt);
   updateAnchors();
   renderer.render(scene, camera);
