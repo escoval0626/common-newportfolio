@@ -3490,14 +3490,16 @@ const ROOM_WINDOW_RADIUS = (ROW_H * 1.5 + ROOM_GAP) * (IS_TOUCH ? 2.2 : 6);
 const SPHERE_ROOM = !IS_TOUCH && !MOBILE_LAYOUT;
 const SPHERE = {
   r0: 6.4,          /* 17 点のときの半径。点数の平方根で伸縮し、面の密度を保つ（5.4 だと重なりが強すぎた） */
-  fill: 0.86,       /* 画面の半分の高さのうち、球（極の板の端まで）に使う割合。下のサムネ帯に被らない線 */
+  fill: 0.74,       /* 画面の半分の高さのうち、球（極の板の端まで）に使う割合。0.86 は本人が「もう少し引き」（10/15） */
   tilt: 23,         /* 回転軸が画面の面内で傾く角度（度） */
   drift: 3.438,     /* 自転の速さ（度/秒）。手を触れない間だけ回る */
-  camDrop: 3.0,     /* カメラは球の中心よりこれだけ下から見上げる（地面が画面下に残る） */
-  lookDrop: 0.9,    /* 注視点は中心より少し下＝球を画面のやや上に置き、下のサムネ帯から離す */
+  rise: 1.1,        /* 球の中心は目の高さよりこれだけ上。カメラは旅と同じ高さ・同じ向きのまま進む（上を向かない） */
+  lookDrop: 0.5,    /* 注視点は中心より少し下＝球を画面のやや上に置き、下のサムネ帯から離す */
+  sheaf: 9.5,       /* 散る前の束を置く距離（カメラの定位置から前方）。旧カルーセルの壁と同じ距離 */
   turnPerPx: 0.004, /* ドラッグ 1px あたりの回転（rad）。photo-grid と同じ */
-  dealOut: 0.55,    /* 開いた瞬間、中心から面へ板が散っていく時間（秒） */
-  lag: 0.055,       /* 板ごとのずれ（正面側から順に） */
+  dealOut: 1.25,    /* 開いた瞬間、手前の束から面へ板が散っていく時間（秒）。カメラが着く 1.9 秒と同時に終わる */
+  lag: 0.03,        /* 板ごとのずれ（正面側から順に） */
+  gather: 0.9,      /* 閉じる時、面から束へ戻る時間（秒）。カメラの戻り（約 1.1 秒）の内側 */
 };
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 
@@ -3739,10 +3741,15 @@ function buildPlaceRoom(area) {
     const lean = THREE.MathUtils.degToRad(SPHERE.tilt);
     /* 回転軸：画面の面内で、鉛直から right 側へ lean だけ倒す */
     const axis = up.clone().multiplyScalar(Math.cos(lean)).addScaledVector(right, Math.sin(lean)).normalize();
-    /* 球の底の板が地面に刺さらない高さ */
-    const cy = GROUND_Y + R + ROW_H / 2 + 0.4;
+    /* 中心は目の高さの少し上。地面は面として描いていない（粒と水彩だけ）ので、
+       下側の板が地平より下へ回っても遮られない。カメラを上へ向けないための選択 */
+    const eyeY = GROUND_Y + 2.35;
     const center = area.center.clone().addScaledVector(dir, 0.5 + stand);
-    center.y = cy;
+    center.y = eyeY + SPHERE.rise;
+    /* 散る前の束：カメラの定位置から前方 sheaf（旧カルーセルの壁と同じ距離）。
+       絵がほどけた粒の向こうから板が立ち上がり、奥の面へ散っていく */
+    const sheaf = area.center.clone().addScaledVector(dir, 0.5 + SPHERE.sheaf);
+    sheaf.y = eyeY + 0.6;
     /* フィボナッチ球：高さは等面積に、方位は黄金角ずつ */
     meshes.forEach((m, i) => {
       const y = 1 - (2 * (i + 0.5)) / n;
@@ -3753,10 +3760,11 @@ function buildPlaceRoom(area) {
         .addScaledVector(back, Math.cos(ang) * rr);
     });
     sph = {
-      R, stand, axis, center, back,
+      R, stand, axis, center, back, sheaf, right, up,
       drift: THREE.MathUtils.degToRad(SPHERE.drift),
       spin: 0, spinVel: 0, spinTo: null, aimIdx: null,
       openAt: -1, /* 板が面へ散り始める時刻（clock 基準）。-1 は配置済み扱い */
+      closeAt: -1, /* 束へ戻り始める時刻。-1 は戻っていない */
     };
   }
 
@@ -3783,9 +3791,9 @@ function buildPlaceRoom(area) {
   const look = area.center.clone().addScaledVector(dir, 9.5);
   look.y = yBase;
   if (sph) {
-    /* 球の中心から stand だけ手前、少し下から見上げる */
+    /* 球の中心から stand だけ手前。高さは旅のカメラと同じ（上下に動かさない） */
     view.copy(sph.center).addScaledVector(dir, -sph.stand);
-    view.y = sph.center.y - SPHERE.camDrop;
+    view.y = GROUND_Y + 2.35;
     look.copy(sph.center);
     look.y -= SPHERE.lookDrop;
   }
@@ -3851,8 +3859,13 @@ function sphereSpot(r, m, out) {
   const s = r.sphere;
   sphereDir(r, m, s.spin);
   const k = m.userData.dealt == null ? 1 : m.userData.dealt;
-  /* 散る前は中心のやや手前にまとまっている（photo-grid の entry と同じ考え） */
-  return out.copy(s.center).addScaledVector(s.back, 0.6 * (1 - k)).addScaledVector(_sd, s.R * k);
+  if (k >= 1) return out.copy(s.center).addScaledVector(_sd, s.R);
+  /* 散る前：手前の束に、面での並びをゆるく縮めて置く（横 2.6・縦 1.6）。
+       そこから各自の面の位置へ（photo-grid の entryPose と同じ考え） */
+  const u = m.userData.unit;
+  _sc.copy(s.sheaf).addScaledVector(s.right, u.dot(s.right) * 2.6).addScaledVector(s.up, u.dot(s.up) * 1.6);
+  out.copy(s.center).addScaledVector(_sd, s.R);
+  return out.lerpVectors(_sc, out, k);
 }
 
 /* カルーセルと球で共通の「現在地」と「i 番目へ」 */
@@ -3913,10 +3926,14 @@ function updateSphere(r, dt) {
     if (m === r.zoomed || (r.locked && r.locked.has(m))) continue; /* GSAP が握っている */
     const d = m.userData;
     let k = 1;
-    if (s.openAt >= 0) {
+    const inOut = (p) => p * p * (3 - 2 * p);
+    if (s.closeAt >= 0) {
+      /* 閉じる：面から束へ戻る（正面側の板ほど先に戻る） */
+      const t = (now - s.closeAt - (d.lag || 0) * 0.5) / (REDUCE_MOTION ? 0.001 : SPHERE.gather);
+      k = 1 - inOut(THREE.MathUtils.clamp(t, 0, 1));
+    } else if (s.openAt >= 0) {
       const t = (now - s.openAt - (d.lag || 0)) / (REDUCE_MOTION ? 0.001 : SPHERE.dealOut);
-      const p = THREE.MathUtils.clamp(t, 0, 1);
-      k = 1 - Math.pow(1 - p, 3); /* easeOutCubic */
+      k = inOut(THREE.MathUtils.clamp(t, 0, 1));
     }
     d.dealt = k;
     if (!d.wallPos) d.wallPos = new THREE.Vector3();
@@ -3928,7 +3945,7 @@ function updateSphere(r, dt) {
     _se.set(d.tiltX || 0, d.tiltY || 0, 0);
     _sq.setFromEuler(_se);
     m.quaternion.copy(camera.quaternion).multiply(_sq);
-    const g = (0.35 + 0.65 * k) * (1 + lift * 0.03);
+    const g = (0.7 + 0.3 * k) * (1 + lift * 0.03);
     m.scale.set(d.w * g, d.h * g, 1);
   }
 }
@@ -4598,8 +4615,9 @@ function openGallery(area) {
     /* 前回見ていた（または先頭の）板が正面に来る向きから始める */
     s.spin = sphereFrontSpin(room, room.meshes[room.startIdx] || room.meshes[0]);
     s.spinTo = null; s.spinVel = 0; s.aimIdx = null;
-    /* カメラが寄り始めて少し経ってから、中心から面へ散る */
-    s.openAt = clock.elapsedTime + 0.6;
+    /* カメラが寄り始めてすぐ、手前の束から面へ散り始め、カメラが着く頃に散り終わる */
+    s.openAt = clock.elapsedTime + 0.35;
+    s.closeAt = -1;
     s.dealOrder = null;
     room.meshes.forEach((m) => { m.userData.dealt = 0; });
     updateSphere(room, 0);
@@ -4775,6 +4793,10 @@ function closeGallery(instant = false) {
     activeRoom.artworks.forEach((a) => { a.group.visible = true; });
   }
   const closingRoom = activeRoom; /* nullにする前に、後片付け用に保持しておく */
+  if (closingRoom && closingRoom.sphere && !instant) {
+    /* 球は、来た道を戻る：面から手前の束へ集まりながら薄れていく */
+    closingRoom.sphere.closeAt = clock.elapsedTime;
+  }
   activeRoom = null;              /* 先に操作対象を旅へ戻す */
   document.body.style.cursor = "";
   if (!tl) { galleryOpen = false; return; }

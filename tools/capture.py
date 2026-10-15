@@ -149,6 +149,9 @@ class Session:
         window.__vt0 = window.__vt;
         window.__gsapBase = x.gsap.ticker.time;
         x.gsap.ticker.sleep();
+        // 新しい tween が作られると GSAP は ticker を起こし、実時間で進み始める（python の sleep 中に
+        // タイムラインだけ先に終わる＝仮想時計とずれる）。起こされないようにする
+        x.gsap.ticker.wake = () => {};
         window.__lastErr = null;
         window.addEventListener('error', (e) => { window.__lastErr = String(e.message || e); });
         window.__step = (n, dt) => {
