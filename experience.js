@@ -3487,7 +3487,14 @@ const ROOM_WINDOW_RADIUS = (ROW_H * 1.5 + ROOM_GAP) * (IS_TOUCH ? 2.2 : 6);
    タッチ端末と狭い幅は従来のカルーセル（球は指で回す物語がまだ無い）。
    2 点だけの部屋（EXHIBITIONS）も壁掛けのまま。
    数値は UNTITLED 側の実測（tilt 23°・1 周 105 秒＝3.438°/s）をそのまま使う */
-const SPHERE_ROOM = !IS_TOUCH && !MOBILE_LAYOUT;
+/* 球にするかは「部屋を組む時点」で決める。モジュール読み込み時の定数にすると、
+   狭い窓（ペインやサイドバー付き）で読み込んでから広げた場合に一列のまま固定される
+   （2026-10-20 本番で実際に起きた）。主な入力がマウス／トラックパッド（hover と fine pointer）
+   で、かつ窓幅が PC 相当なら球。タッチ画面付きノートPC は maxTouchPoints>0 だが主入力は
+   マウスなので球にする（IS_TOUCH で判定しない） */
+function canSphere() {
+  return matchMedia("(hover: hover) and (pointer: fine)").matches && innerWidth > 767;
+}
 const SPHERE = {
   r0: 6.4,          /* 17 点のときの半径。点数の平方根で伸縮し、面の密度を保つ（5.4 だと重なりが強すぎた） */
   fill: 0.74,       /* 画面の半分の高さのうち、球（極の板の端まで）に使う割合。0.86 は本人が「もう少し引き」（10/15） */
@@ -3590,7 +3597,7 @@ function buildPlaceRoom(area) {
      不明瞭になるため、部屋はカテゴリごとに独立させる */
   const shots = (area.photos || []).map(([u, c, award]) => ({ u, c, award, ar: area }));
   const startIdx = 0;
-  const sphere = SPHERE_ROOM && shots.length > 2;
+  const sphere = canSphere() && shots.length > 2;
   const GAP = ROOM_GAP, PAD = ROOM_PAD;
   const yBase = GROUND_Y + 2.5;
   const faceY = Math.atan2(-dir.x, -dir.z);
@@ -4630,10 +4637,10 @@ function openGallery(area) {
   roomScroll.target = roomScroll.current = room.pairHang ? 0 : room.offsetOf(room.startIdx);
   /* white-space:nowrap と組ませて、モバイル幅では明示的な位置で2行に割る。
      自動折返しに任せると "SCROL" "L" のように単語の途中で割れていた */
-  hint.innerHTML = IS_TOUCH
-    ? '<span lang="en">SWIPE</span> — 流す<span class="hud__hint__sep"></span><br class="hud__hint__br"><span lang="en">TAP</span> — 大きく見る'
-    : room.sphere
-      ? '<span lang="en">DRAG / SCROLL</span> — 回す<span class="hud__hint__sep"></span><br class="hud__hint__br"><span lang="en">CLICK</span> — 大きく見る'
+  hint.innerHTML = room.sphere
+    ? '<span lang="en">DRAG / SCROLL</span> — 回す<span class="hud__hint__sep"></span><br class="hud__hint__br"><span lang="en">CLICK</span> — 大きく見る'
+    : IS_TOUCH
+      ? '<span lang="en">SWIPE</span> — 流す<span class="hud__hint__sep"></span><br class="hud__hint__br"><span lang="en">TAP</span> — 大きく見る'
       : '<span lang="en">DRAG / SCROLL</span> — 流す<span class="hud__hint__sep"></span><br class="hud__hint__br"><span lang="en">CLICK</span> — 大きく見る';
   hint.classList.remove("is-faded");
   roomBack.classList.add("is-visible");
