@@ -5,3 +5,6 @@ assets/models/real/
 
 # ライブラリの取得先。vendor/ に必要なファイルだけ実体を置いてある
 node_modules/
+
+# 撮影ドライバ（ヘッドレスEdge+CDP）。開発用で配信物ではない
+tools/
