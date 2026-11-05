@@ -46,6 +46,19 @@ const ALT = (() => {
   try { return JSON.parse(fs.readFileSync("works-alt.json", "utf8")); } catch (e) { return {}; }
 })();
 
+/* 検索から来た人向けの、各シリーズの説明文（1文＋点数）。
+   works.html は英語の作品名の羅列で Google が読める日本語がほぼ無かった（Search Console 2026-11-05: 3か月で 0クリック・6表示）。
+   何が写っているかを works-alt.json の範囲で書く。場所や建物の用途は推測で書かない。
+   works.html は手で直してもビルドで上書きされるので、ここに書く。 */
+const DESC = {
+  PLANTS: "白いノコギリソウ、露をのせた葉、逆光のススキ、水滴のついたコスモス、種を飛ばすタンポポ。草花の光を撮った植物の写真17点。",
+  LANDSCAPES: "朝霧の池、霧の中の森、水に沈んだ木立、雲のかかる尾根、湖の小舟、岩の間を落ちる水。霧と水辺の多い風景写真19点。",
+  ARCHITECTURES: "コンクリートに落ちる光の筋、鉄骨とガラスの連なり、霧の中の白い建物、雨の温泉街、夜の中庭。建物と街の写真23点。",
+  SNAPS: "誰もいないブランコ、ガラスの風鈴、夕暮れの桟橋、水面の白い鳥、古い町並みの横断歩道、窓辺で待つ人。日常のスナップ写真12点。",
+  ABSTRACTS: "横に流れる緑、光の粒をまとった茎、重なるパンジー、窓ガラス越しの木立、琥珀色のカーテン。ぼけと重なりで輪郭をほどいた抽象写真9点。",
+  EXHIBITIONS: "epSITE ONLINE PHOTO CONTEST 2023 入賞作「Wrapped」と、BOKEHPHOTOFAN GROUP EXHIBITION 2024 出展作「Tiny World」。",
+};
+
 const thumb = (u) => u.replace(/\/([^/]+)$/, "/thumb/$1");
 const esc = (s) => String(s)
   .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -87,11 +100,12 @@ const esc = (s) => String(s)
       '        <h2><span class="series__num">' + a.num + '</span><span lang="en">' + a.name + "</span></h2>",
       '        <p class="series__line">' + esc(a.lines.join("")) + "</p>",
       '        <p class="series__line series__line--en" lang="en">' + esc(a.en) + "</p>",
+      DESC[a.name] ? '        <p class="series__desc">' + esc(DESC[a.name]) + "</p>" : null,
       '        <div class="grid">',
       figs,
       "        </div>",
       "      </section>",
-    ].join("\n");
+    ].filter(Boolean).join("\n");
   }).join("\n");
 
   const jsonld = {
@@ -174,7 +188,9 @@ JSON.stringify(jsonld, null, 2),
 '    .series__num { font-size: 12px; letter-spacing: 0.2em; color: var(--ink-dim); }',
 '    .series__line { margin: 0; color: var(--ink-mid); font-size: 15px; }',
 '    .series__line--en { font-family: var(--font-latin); font-size: 12px; letter-spacing: 0.1em;',
-'      color: var(--ink-dim); margin-bottom: 26px; }',
+'      color: var(--ink-dim); margin-bottom: 14px; }',
+'    /* 検索から来た人向けの説明。何が写っているかをキャプションの範囲で書く（場所や用途の推測はしない） */',
+'    .series__desc { margin: 0 0 26px; max-width: 44em; font-size: 13px; line-height: 1.9; color: var(--ink-mid); }',
 '    .grid { display: grid; gap: clamp(18px, 2.4vw, 30px);',
 '      grid-template-columns: repeat(auto-fill, minmax(216px, 1fr)); }',
 '    figure { margin: 0; }',
