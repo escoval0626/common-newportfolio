@@ -4207,7 +4207,9 @@ function openZoom(mesh) {
   if (zoomCloseBtn) {
     zoomCloseBtn.classList.add("is-visible");
     zoomCloseBtn.tabIndex = 0;
-    zoomCloseBtn.focus();
+    /* 写真をクリックして開いた人が ← → で送ると × が :focus-visible になり
+       二重丸に囲まれていた。部屋の BACK と同じく、キーボードで開いた時だけ移す */
+    focusIfKeyboard(zoomCloseBtn);
   }
 
   if (zoomTl) zoomTl.kill();
@@ -5120,6 +5122,7 @@ if (hudLogo) {
   hudLogo.addEventListener("click", (e) => {
     e.stopPropagation();
     if (!rig.entered) return; /* ENTER前は押しても何もしない（旅がまだ始まっていない） */
+    if (!lastInputKeyboard) hudLogo.blur(); /* マウスで押した後に矢印キーで進めても枠を出さない */
     warpTo(0);
     hint.classList.remove("is-faded");
   });
@@ -5132,6 +5135,7 @@ if (hudContact) {
   hudContact.addEventListener("click", (e) => {
     e.stopPropagation();
     if (!rig.entered) return;
+    if (!lastInputKeyboard) hudContact.blur(); /* ロゴと同じ。マウスで押した後に枠を出さない */
     warpTo(CONTACT_T);
     hint.classList.add("is-faded");
   });
@@ -5212,7 +5216,12 @@ enterBtn.addEventListener("click", () => {
   /* .hud 自体が visibility:hidden で始まるため、is-active を先に
      付けないと子孫の hudLogo はフォーカス不可能（実測で確認） */
   hud.classList.add("is-active");
-  hudLogo.focus();
+  /* マウスで ENTER を押した人までロゴへ移すと、その後に矢印キーやスペースで
+     旅を進めた瞬間に Chrome がロゴを :focus-visible とみなし、ロゴが四角く
+     囲まれていた（2026-11-05 本人指摘）。キーボードで押した時だけ移し、
+     マウスの時は隠れる enterBtn からフォーカスを外して <body> に置く */
+  if (lastInputKeyboard) hudLogo.focus();
+  else enterBtn.blur();
   if (areaLive) areaLive.textContent = "旅を始めました。";
   /* 綿毛を専用シーンから本編sceneへ戻す。以後は通常どおりrenderer.render
      （メインのxpCanvas）だけが綿毛を描き、loaderFluffCanvas側は
